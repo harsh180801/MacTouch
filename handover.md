@@ -1,9 +1,9 @@
 # MacTouch handover
 
-Handoff document for continuing MacTouch development after Phases 1–7 MVP.
+Handoff document for continuing MacTouch development after Phases 1–8 (initial action slice).
 
 **Date:** 2026-08-17  
-**Workspace:** `/Users/harsh/.cursor/MacTouch` (Phase 7 worktree: `.worktrees/phase6-calibration` on `feature/phase7-menubar`)  
+**Workspace:** `/Users/harsh/.cursor/MacTouch`  
 **Dev machine used:** MacBook Pro 14" (Mac16,8), Apple M4 Pro, macOS 26.5.2, arm64  
 **Sensor:** `AppleSPUHIDDevice` accel present (`PrimaryUsagePage=0xFF00`, `PrimaryUsage=3`, 22-byte reports)
 
@@ -22,7 +22,7 @@ Design goals (from the original brief):
 
 ---
 
-## Current status (Phases 1–7 MVP)
+## Current status (Phases 1–8, initial action slice)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
@@ -33,11 +33,11 @@ Design goals (from the original brief):
 | 5 Gestures | Done | Single / double / triple grouping |
 | 6 Calibration | Done | Live wizard → `MacTouchSettings` JSON |
 | 7 SwiftUI menu bar | **MVP done** | `MacTouchApp` — listen, counters, sliders, calibrate (no waveform yet) |
-| 8 Actions | **Not started** | Mute, Shortcuts, launch app, notify |
+| 8 Actions | **In progress** | Shortcut mappings + output mute toggle with cooldown/busy guards |
 
 **Tests:** run `swift test` before starting new work.
 
-**App:** `swift run MacTouchApp` — design in `docs/design/2026-08-17-menubar-app.md`.
+**App:** `swift run MacTouchApp` — designs in `docs/design/2026-08-17-menubar-app.md` and `docs/design/2026-08-17-shortcut-actions.md`.
 
 **Settings path:** calibrated JSON defaults to `~/.config/MacTouch/settings.json` (`MacTouchSettings.defaultConfigURL`).
 
@@ -60,7 +60,9 @@ Sources/MacTouchCore/
   Calibration/              CalibrationService, CalibrationSession, CalibrationAnalyzer
   Settings/                 MacTouchSettings (Codable JSON load/save)
 Sources/MacTouchProbe/      CLI entry point
+Sources/MacTouchApp/        Menu-bar app (`MenuBarExtra`) + action dispatcher
 Tests/MacTouchCoreTests/
+Tests/MacTouchAppTests/
 Fixtures/recordings/        Scrubbed fixtures only (after privacy review)
 Recordings/                 Local captures (gitignored) — do not commit raw sessions blindly
 ```
@@ -102,11 +104,16 @@ swift run MacTouchProbe --calibrate --config-out ~/.config/MacTouch/settings.jso
 
 # Apply calibrated settings
 swift run MacTouchProbe --gestures --config ~/.config/MacTouch/settings.json --duration 15 --every 100
+
+# Menu-bar app (Phase 7/8)
+swift run MacTouchApp
 ```
 
 Light taps on palm rest / lid edge only. Do not strike the display.
 
 **Calibration prompts:** idle (keep still) → five single taps (~1 s apart) → five double-taps (~0.15 s apart). Exit code **7** if incomplete or analyzer rejects samples; **8** if settings JSON load/save fails.
+
+**Action settings path:** `~/.config/MacTouch/actions.json` (menu-bar app only).
 
 ---
 
@@ -164,12 +171,15 @@ If detection regresses on another Mac model, re-tune with `--calibrate` or a sho
 
 ---
 
-## Recommended next work (Phase 7+ / 8)
+## Recommended next work (Phase 8 continuation)
 
-1. **Phase 7 follow-ups (optional UI)** — waveform, debug event log, Launch at Login / `.app` bundle polish
-2. **Phase 8 — Actions** (only after detection is reliable)
-   - Mute, Shortcuts, launch app, notification
-   - Explicit confirmation before arbitrary shell
+1. **Action expansion / hardening**
+   - Add more action types (app launch, notifications, etc.)
+   - Optional queue/retry/history UI for actions
+   - Better action diagnostics in popover
+2. **Phase 7 UI follow-ups (optional)**
+   - Waveform + debug event log
+   - Launch at Login / `.app` bundle polish
 
 Keep CLI (`MacTouchProbe`) working for offline regression while the UI grows.
 
@@ -188,6 +198,12 @@ CalibrationService (live only)
     → CalibrationSession (idle → singles → doubles)
         → CalibrationAnalyzer.recommend → MacTouchSettings → ~/.config/MacTouch/settings.json
             → applied to TapDetectorConfig / GestureRecognizerConfig via --config
+
+MacTouchApp action layer (Phase 8 initial slice)
+    → ActionSettings (~/.config/MacTouch/actions.json)
+    → ShortcutActionDispatcher
+        → shortcuts run "<name>"  OR  osascript mute toggle
+        → cooldown + in-flight guard
 ```
 
 Replay path: `SensorRecordingIO` / `SensorReplayer` feeds the same pipeline without HID. Calibration is live-only (no `--replay --calibrate`).
@@ -221,4 +237,4 @@ Hardware constants (community-documented):
 - Unit-test signal math and gesture timing; use recordings for replay tests.
 - Preserve third-party attribution.
 
-When resuming: read this file + `README.md` + `docs/design/2026-08-17-menubar-app.md`, run `swift test`, then start **Phase 8** or Phase 7 UI follow-ups unless the user redirects.
+When resuming: read this file + `README.md` + `docs/design/2026-08-17-shortcut-actions.md`, run `swift test`, then continue **Phase 8** action expansion/hardening unless the user redirects.

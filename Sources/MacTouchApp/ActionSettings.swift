@@ -1,11 +1,20 @@
 import Foundation
 import MacTouchCore
 
+enum GestureActionKind: String, Codable, CaseIterable, Equatable, Sendable {
+    case none
+    case shortcut
+    case toggleMute
+}
+
 struct ActionSettings: Codable, Equatable, Sendable {
     var enabled: Bool
     var singleShortcutName: String?
     var doubleShortcutName: String?
     var tripleShortcutName: String?
+    var singleActionKind: GestureActionKind?
+    var doubleActionKind: GestureActionKind?
+    var tripleActionKind: GestureActionKind?
     var cooldownSeconds: Double
 
     init(
@@ -13,12 +22,18 @@ struct ActionSettings: Codable, Equatable, Sendable {
         singleShortcutName: String? = nil,
         doubleShortcutName: String? = nil,
         tripleShortcutName: String? = nil,
+        singleActionKind: GestureActionKind? = nil,
+        doubleActionKind: GestureActionKind? = nil,
+        tripleActionKind: GestureActionKind? = nil,
         cooldownSeconds: Double = 1.2
     ) {
         self.enabled = enabled
         self.singleShortcutName = ActionSettings.normalizedName(singleShortcutName)
         self.doubleShortcutName = ActionSettings.normalizedName(doubleShortcutName)
         self.tripleShortcutName = ActionSettings.normalizedName(tripleShortcutName)
+        self.singleActionKind = singleActionKind
+        self.doubleActionKind = doubleActionKind
+        self.tripleActionKind = tripleActionKind
         self.cooldownSeconds = cooldownSeconds
     }
 
@@ -26,6 +41,9 @@ struct ActionSettings: Codable, Equatable, Sendable {
         singleShortcutName = ActionSettings.normalizedName(singleShortcutName)
         doubleShortcutName = ActionSettings.normalizedName(doubleShortcutName)
         tripleShortcutName = ActionSettings.normalizedName(tripleShortcutName)
+        if actionKind(for: .single) != .shortcut { singleShortcutName = nil }
+        if actionKind(for: .double) != .shortcut { doubleShortcutName = nil }
+        if actionKind(for: .triple) != .shortcut { tripleShortcutName = nil }
     }
 
     func shortcutName(for kind: TapGestureKind) -> String? {
@@ -33,6 +51,32 @@ struct ActionSettings: Codable, Equatable, Sendable {
         case .single: singleShortcutName
         case .double: doubleShortcutName
         case .triple: tripleShortcutName
+        }
+    }
+
+    func actionKind(for kind: TapGestureKind) -> GestureActionKind {
+        switch kind {
+        case .single:
+            return singleActionKind ?? (singleShortcutName == nil ? .none : .shortcut)
+        case .double:
+            return doubleActionKind ?? (doubleShortcutName == nil ? .none : .shortcut)
+        case .triple:
+            return tripleActionKind ?? (tripleShortcutName == nil ? .none : .shortcut)
+        }
+    }
+
+    mutating func setActionKind(_ newValue: GestureActionKind, for kind: TapGestureKind) {
+        switch kind {
+        case .single: singleActionKind = newValue
+        case .double: doubleActionKind = newValue
+        case .triple: tripleActionKind = newValue
+        }
+        if newValue != .shortcut {
+            switch kind {
+            case .single: singleShortcutName = nil
+            case .double: doubleShortcutName = nil
+            case .triple: tripleShortcutName = nil
+            }
         }
     }
 

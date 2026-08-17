@@ -166,17 +166,14 @@ struct ContentView: View {
 
             shortcutRow(
                 title: "Single",
-                value: model.actionSettings.singleShortcutName ?? "",
                 kind: .single
             )
             shortcutRow(
                 title: "Double",
-                value: model.actionSettings.doubleShortcutName ?? "",
                 kind: .double
             )
             shortcutRow(
                 title: "Triple",
-                value: model.actionSettings.tripleShortcutName ?? "",
                 kind: .triple
             )
 
@@ -193,18 +190,41 @@ struct ContentView: View {
         }
     }
 
-    private func shortcutRow(title: String, value: String, kind: TapGestureKind) -> some View {
-        HStack(spacing: 6) {
+    private func shortcutRow(title: String, kind: TapGestureKind) -> some View {
+        let actionKind = model.actionKind(for: kind)
+        let currentName = model.actionSettings.shortcutName(for: kind) ?? ""
+        return HStack(spacing: 6) {
             Text(title)
                 .frame(width: 42, alignment: .leading)
-            TextField(
-                "Shortcut name",
-                text: Binding(
-                    get: { value },
-                    set: { model.updateShortcutName($0, for: kind) }
+            Picker(
+                "",
+                selection: Binding(
+                    get: { actionKind },
+                    set: { model.updateActionKind($0, for: kind) }
                 )
-            )
-            .textFieldStyle(.roundedBorder)
+            ) {
+                Text("None").tag(GestureActionKind.none)
+                Text("Shortcut").tag(GestureActionKind.shortcut)
+                Text("Mute").tag(GestureActionKind.toggleMute)
+            }
+            .labelsHidden()
+            .frame(width: 94)
+
+            if actionKind == .shortcut {
+                TextField(
+                    "Shortcut name",
+                    text: Binding(
+                        get: { currentName },
+                        set: { model.updateShortcutName($0, for: kind) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+            } else {
+                Text(actionKind == .toggleMute ? "Toggle output mute" : "No action")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Button("Run") {
                 model.runShortcutNow(kind)
             }

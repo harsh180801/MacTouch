@@ -106,6 +106,9 @@ final class AppViewModel {
 
     func updateShortcutName(_ value: String, for kind: TapGestureKind) {
         let normalized = ActionSettings.normalizedName(value)
+        if normalized != nil {
+            actionSettings.setActionKind(.shortcut, for: kind)
+        }
         switch kind {
         case .single:
             actionSettings.singleShortcutName = normalized
@@ -114,6 +117,15 @@ final class AppViewModel {
         case .triple:
             actionSettings.tripleShortcutName = normalized
         }
+        scheduleActionSettingsSave()
+    }
+
+    func actionKind(for kind: TapGestureKind) -> GestureActionKind {
+        actionSettings.actionKind(for: kind)
+    }
+
+    func updateActionKind(_ value: GestureActionKind, for kind: TapGestureKind) {
+        actionSettings.setActionKind(value, for: kind)
         scheduleActionSettingsSave()
     }
 
