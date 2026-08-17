@@ -320,6 +320,7 @@ enum MacTouchProbe {
                 """
                 ERROR: Device opened but zero samples arrived.
                 The SPU driver may still be asleep, blocked by permissions, or not streaming.
+                Retry calibration after confirming Input Monitoring permission and that live capture receives samples.
                 """,
                 stderr
             )
@@ -336,9 +337,15 @@ enum MacTouchProbe {
             try settings.save(to: configOut)
             fputs("Wrote \(configOut.path)\n", stderr)
             exit(0)
-        } catch is CalibrationAnalyzerError {
+        } catch let error as CalibrationAnalyzerError {
+            printCalibrationFailure(error.localizedDescription, state: state)
             exit(7)
-        } catch is MacTouchSettingsError {
+        } catch CalibrationSessionError.incomplete {
+            printCalibrationFailure("calibration session did not reach the final stage", state: state)
+            exit(7)
+        } catch let error as MacTouchSettingsError {
+            fputs("ERROR writing calibration settings to \(configOut.path): \(error.localizedDescription)\n", stderr)
+            fputs("Retry with --config-out pointing to a writable JSON path.\n", stderr)
             exit(8)
         } catch {
             fputs("ERROR: \(error.localizedDescription)\n", stderr)
@@ -352,6 +359,17 @@ enum MacTouchProbe {
         print("  groupingWindow=\(settings.groupingWindow)")
         print("  gestureCooldown=\(settings.gestureCooldown)")
         print("Suggested: swift run MacTouchProbe --gestures --config \(configOut.path)")
+    }
+
+    private static func printCalibrationFailure(_ reason: String, state: CalibrationRunState) {
+        let snapshot = state.snapshot
+        let progress = snapshot.lastProgress
+        fputs("ERROR: calibration failed: \(reason).\n", stderr)
+        fputs(
+            "Collected samples=\(snapshot.sampleCount) idle=\(progress?.idleSamples ?? 0) singles=\(progress?.singleCount ?? 0)/\(progress?.requiredSingles ?? CalibrationAnalyzer.minimumSingles) doubles=\(progress?.doublePairCount ?? 0)/\(progress?.requiredDoubles ?? CalibrationAnalyzer.minimumDoubles).\n",
+            stderr
+        )
+        fputs("Retry: keep the Mac still during idle, then complete the single-tap and double-tap prompts within the timeout.\n", stderr)
     }
 
     // MARK: - Pipeline configuration
@@ -470,12 +488,14 @@ private final class SampleCounter: @unchecked Sendable {
 private final class CalibrationRunState: @unchecked Sendable {
     private let lock = NSLock()
     private var lastPrompt: String?
+    private var progress: CalibrationProgress?
     private var done = false
     private var samples = 0
 
     func record(progress: CalibrationProgress) {
         lock.lock()
         samples += 1
+        self.progress = progress
         let shouldPrint = progress.prompt != lastPrompt
         if shouldPrint {
             lastPrompt = progress.prompt
@@ -500,6 +520,12 @@ private final class CalibrationRunState: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return samples
+    }
+
+    var snapshot: (sampleCount: Int, lastProgress: CalibrationProgress?) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (samples, progress)
     }
 }
 

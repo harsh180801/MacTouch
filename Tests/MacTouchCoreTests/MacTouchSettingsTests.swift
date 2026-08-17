@@ -39,9 +39,55 @@ struct MacTouchSettingsTests {
         try Data(#"{ "version": 99, "minAbsoluteThresholdG": 0.02, "groupingWindow": 0.4, "gestureCooldown": 0.2, "calibratedAt": "2020-01-01T00:00:00Z" }"#.utf8)
             .write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
-        #expect(throws: MacTouchSettingsError.self) {
+        #expect(throws: MacTouchSettingsError.unsupportedVersion(99)) {
             _ = try MacTouchSettings.load(from: url)
         }
+    }
+
+    @Test func loadRejectsInvalidTunedValues() throws {
+        let cases: [(name: String, json: String, expected: MacTouchSettingsError)] = [
+            (
+                "threshold",
+                #"{ "version": 1, "minAbsoluteThresholdG": -5, "groupingWindow": 0.4, "gestureCooldown": 0.2, "calibratedAt": "2020-01-01T00:00:00Z" }"#,
+                .invalidValue(field: "minAbsoluteThresholdG", value: -5, reason: "must be finite and greater than 0")
+            ),
+            (
+                "grouping",
+                #"{ "version": 1, "minAbsoluteThresholdG": 0.02, "groupingWindow": 999, "gestureCooldown": 0.2, "calibratedAt": "2020-01-01T00:00:00Z" }"#,
+                .invalidValue(field: "groupingWindow", value: 999, reason: "must be 5.0 seconds or less")
+            ),
+            (
+                "cooldown",
+                #"{ "version": 1, "minAbsoluteThresholdG": 0.02, "groupingWindow": 0.4, "gestureCooldown": 0, "calibratedAt": "2020-01-01T00:00:00Z" }"#,
+                .invalidValue(field: "gestureCooldown", value: 0, reason: "must be finite and greater than 0")
+            )
+        ]
+
+        for testCase in cases {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("mactouch-invalid-\(testCase.name)-\(UUID().uuidString).json")
+            try Data(testCase.json.utf8).write(to: url)
+            defer { try? FileManager.default.removeItem(at: url) }
+
+            #expect(throws: testCase.expected) {
+                _ = try MacTouchSettings.load(from: url)
+            }
+        }
+    }
+
+    @Test func settingsErrorLocalizedDescriptionContainsUsefulText() {
+        let version = MacTouchSettingsError.unsupportedVersion(99).localizedDescription
+        let invalid = MacTouchSettingsError.invalidValue(
+            field: "groupingWindow",
+            value: -1,
+            reason: "must be finite and greater than 0"
+        ).localizedDescription
+        let io = MacTouchSettingsError.ioFailed("permission denied").localizedDescription
+
+        #expect(version.contains("unsupported settings version 99"))
+        #expect(invalid.contains("groupingWindow"))
+        #expect(invalid.contains("must be finite and greater than 0"))
+        #expect(io.contains("permission denied"))
     }
 
     @Test func saveCreatesParentDirectories() throws {

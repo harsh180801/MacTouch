@@ -1,14 +1,32 @@
 import Foundation
 
-public enum MacTouchSettingsError: Error, Equatable, Sendable {
+public enum MacTouchSettingsError: Error, Equatable, Sendable, LocalizedError {
     case unsupportedVersion(Int)
     case encodeFailed
     case decodeFailed
     case ioFailed(String)
+    case invalidValue(field: String, value: Double, reason: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unsupportedVersion(let version):
+            return "unsupported settings version \(version); expected \(MacTouchSettings.currentVersion)"
+        case .encodeFailed:
+            return "failed to encode settings JSON"
+        case .decodeFailed:
+            return "failed to decode settings JSON"
+        case .ioFailed(let reason):
+            return "settings I/O failed: \(reason)"
+        case .invalidValue(let field, let value, let reason):
+            return "invalid settings value \(field)=\(value): \(reason)"
+        }
+    }
 }
 
 public struct MacTouchSettings: Codable, Equatable, Sendable {
     public static let currentVersion = 1
+    private static let maximumLoadedThresholdG = 1.0
+    private static let maximumLoadedDurationSeconds = 5.0
 
     public var version: Int
     public var minAbsoluteThresholdG: Double
@@ -57,6 +75,7 @@ public struct MacTouchSettings: Codable, Equatable, Sendable {
         guard settings.version == currentVersion else {
             throw MacTouchSettingsError.unsupportedVersion(settings.version)
         }
+        try settings.validateLoadedValues()
         return settings
     }
 
@@ -90,5 +109,44 @@ public struct MacTouchSettings: Codable, Equatable, Sendable {
             .appendingPathComponent(".config")
             .appendingPathComponent("MacTouch")
             .appendingPathComponent("settings.json")
+    }
+
+    private func validateLoadedValues() throws {
+        try validatePositiveFinite(
+            minAbsoluteThresholdG,
+            field: "minAbsoluteThresholdG",
+            maximum: Self.maximumLoadedThresholdG,
+            maximumDescription: "must be \(Self.maximumLoadedThresholdG) g or less"
+        )
+        try validatePositiveFinite(
+            groupingWindow,
+            field: "groupingWindow",
+            maximum: Self.maximumLoadedDurationSeconds,
+            maximumDescription: "must be \(Self.maximumLoadedDurationSeconds) seconds or less"
+        )
+        try validatePositiveFinite(
+            gestureCooldown,
+            field: "gestureCooldown",
+            maximum: Self.maximumLoadedDurationSeconds,
+            maximumDescription: "must be \(Self.maximumLoadedDurationSeconds) seconds or less"
+        )
+    }
+
+    private func validatePositiveFinite(
+        _ value: Double,
+        field: String,
+        maximum: Double,
+        maximumDescription: String
+    ) throws {
+        guard value.isFinite, value > 0 else {
+            throw MacTouchSettingsError.invalidValue(
+                field: field,
+                value: value,
+                reason: "must be finite and greater than 0"
+            )
+        }
+        guard value <= maximum else {
+            throw MacTouchSettingsError.invalidValue(field: field, value: value, reason: maximumDescription)
+        }
     }
 }

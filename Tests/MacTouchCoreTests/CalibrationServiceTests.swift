@@ -15,7 +15,7 @@ struct CalibrationServiceTests {
             sessionConfig: CalibrationSessionConfig(idleDurationSeconds: 10, idleWarmupSeconds: 0)
         )
         service.start(at: 0)
-        #expect(throws: CalibrationAnalyzerError.self) {
+        #expect(throws: CalibrationSessionError.incomplete) {
             _ = try service.finish()
         }
     }

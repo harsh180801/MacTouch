@@ -38,11 +38,7 @@ public final class CalibrationService {
     }
 
     public func finish() throws -> MacTouchSettings {
-        do {
-            let stats = try session.makeStats()
-            return try CalibrationAnalyzer.recommend(from: stats)
-        } catch CalibrationSessionError.incomplete {
-            throw CalibrationAnalyzerError.insufficientIdle
-        }
+        let stats = try session.makeStats()
+        return try CalibrationAnalyzer.recommend(from: stats)
     }
 }

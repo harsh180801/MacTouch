@@ -59,6 +59,7 @@ public final class CalibrationSession {
         }
         return CalibrationStats(
             idleP95: idleP95,
+            idleSampleCount: idleMagnitudes.count,
             singlePeaks: singlePeaks,
             doubleGaps: doubleGaps
         )

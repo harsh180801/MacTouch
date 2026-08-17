@@ -19,6 +19,33 @@ struct CalibrationAnalyzerTests {
         #expect(settings.minAbsoluteThresholdG < 0.6 * 0.058 + 0.001)
     }
 
+    @Test func floorsThresholdWhenSingleTapPeaksAreTiny() throws {
+        let stats = CalibrationStats(
+            idleP95: 0.010,
+            idleSampleCount: 40,
+            singlePeaks: Array(repeating: 0.015, count: 5),
+            doubleGaps: Array(repeating: 0.15, count: 5)
+        )
+
+        let settings = try CalibrationAnalyzer.recommend(from: stats)
+
+        #expect(settings.minAbsoluteThresholdG == 0.015)
+        #expect(settings.minAbsoluteThresholdG > stats.idleP95)
+    }
+
+    @Test func throwsInsufficientIdleWhenNoIdleSamplesWereCollected() {
+        let stats = CalibrationStats(
+            idleP95: 0,
+            idleSampleCount: 0,
+            singlePeaks: Array(repeating: 0.05, count: 5),
+            doubleGaps: Array(repeating: 0.15, count: 5)
+        )
+
+        #expect(throws: CalibrationAnalyzerError.insufficientIdle) {
+            _ = try CalibrationAnalyzer.recommend(from: stats)
+        }
+    }
+
     @Test func clampsGroupingWindowToBounds() throws {
         let low = CalibrationStats(
             idleP95: 0.005,
