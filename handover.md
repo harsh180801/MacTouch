@@ -1,9 +1,9 @@
 # MacTouch handover
 
-Handoff document for continuing MacTouch development after Phases 1–6.
+Handoff document for continuing MacTouch development after Phases 1–7 MVP.
 
-**Date:** 2026-08-16  
-**Workspace:** `/Users/harsh/.cursor/MacTouch`  
+**Date:** 2026-08-17  
+**Workspace:** `/Users/harsh/.cursor/MacTouch` (Phase 7 worktree: `.worktrees/phase6-calibration` on `feature/phase7-menubar`)  
 **Dev machine used:** MacBook Pro 14" (Mac16,8), Apple M4 Pro, macOS 26.5.2, arm64  
 **Sensor:** `AppleSPUHIDDevice` accel present (`PrimaryUsagePage=0xFF00`, `PrimaryUsage=3`, 22-byte reports)
 
@@ -22,7 +22,7 @@ Design goals (from the original brief):
 
 ---
 
-## Current status (Phases 1–6 complete)
+## Current status (Phases 1–7 MVP)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
@@ -31,11 +31,13 @@ Design goals (from the original brief):
 | 3 Signal processing | Done | Gravity remove, HP/LP, noise floor |
 | 4 Tap detection | Done | Peak/decay/debounce/confidence |
 | 5 Gestures | Done | Single / double / triple grouping |
-| 6 Calibration | **Done** | Live wizard → `MacTouchSettings` JSON |
-| 7 SwiftUI menu bar | **Not started** | Waveform, settings, counters, test mode |
+| 6 Calibration | Done | Live wizard → `MacTouchSettings` JSON |
+| 7 SwiftUI menu bar | **MVP done** | `MacTouchApp` — listen, counters, sliders, calibrate (no waveform yet) |
 | 8 Actions | **Not started** | Mute, Shortcuts, launch app, notify |
 
-**Tests:** run `swift test` before starting new work (full suite includes calibration + settings tests).
+**Tests:** run `swift test` before starting new work.
+
+**App:** `swift run MacTouchApp` — design in `docs/design/2026-08-17-menubar-app.md`.
 
 **Settings path:** calibrated JSON defaults to `~/.config/MacTouch/settings.json` (`MacTouchSettings.defaultConfigURL`).
 
@@ -162,16 +164,9 @@ If detection regresses on another Mac model, re-tune with `--calibrate` or a sho
 
 ---
 
-## Recommended next work (Phase 7+)
+## Recommended next work (Phase 7+ / 8)
 
-1. **Phase 7 — SwiftUI menu-bar app**
-   - Start/stop, waveform, sensor status
-   - Sensitivity / threshold / grouping / cooldown controls bound to `MacTouchSettings`
-   - Calibration wizard UI (reuse `CalibrationService` / session stages)
-   - Single/double/triple counters + debug event log
-   - Test mode (no system actions)
-   - Load/save `~/.config/MacTouch/settings.json`
-
+1. **Phase 7 follow-ups (optional UI)** — waveform, debug event log, Launch at Login / `.app` bundle polish
 2. **Phase 8 — Actions** (only after detection is reliable)
    - Mute, Shortcuts, launch app, notification
    - Explicit confirmation before arbitrary shell
@@ -226,4 +221,4 @@ Hardware constants (community-documented):
 - Unit-test signal math and gesture timing; use recordings for replay tests.
 - Preserve third-party attribution.
 
-When resuming: read this file + `README.md`, run `swift test`, then start **Phase 7** unless the user redirects.
+When resuming: read this file + `README.md` + `docs/design/2026-08-17-menubar-app.md`, run `swift test`, then start **Phase 8** or Phase 7 UI follow-ups unless the user redirects.

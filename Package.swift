@@ -8,7 +8,8 @@ let package = Package(
     ],
     products: [
         .library(name: "MacTouchCore", targets: ["MacTouchCore"]),
-        .executable(name: "MacTouchProbe", targets: ["MacTouchProbe"])
+        .executable(name: "MacTouchProbe", targets: ["MacTouchProbe"]),
+        .executable(name: "MacTouchApp", targets: ["MacTouchApp"])
     ],
     targets: [
         .target(
@@ -19,6 +20,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "MacTouchProbe",
+            dependencies: ["MacTouchCore"]
+        ),
+        .executableTarget(
+            name: "MacTouchApp",
             dependencies: ["MacTouchCore"]
         ),
         .testTarget(

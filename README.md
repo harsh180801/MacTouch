@@ -10,7 +10,8 @@ Native macOS tools that detect **physical taps/knocks on a MacBook aluminum chas
 - **Phase 4:** Tap detection — peak/decay, debounce, confidence, typing/motion rejection.
 - **Phase 5:** Gesture recognition — single / double / triple tap grouping.
 - **Phase 6:** Calibration — live wizard writes JSON settings for detector / gesture tuning.
-- **Phase 7 (next):** SwiftUI menu-bar app — waveform, settings UI, calibration wizard.
+- **Phase 7 (MVP):** SwiftUI menu-bar app — start/stop, counters, settings sliders, in-app calibrate (shared JSON). Waveform / debug log deferred.
+- **Phase 8 (next):** System actions (mute, Shortcuts, etc.).
 
 ## Compatibility
 
@@ -38,7 +39,19 @@ Requires Xcode or Command Line Tools with Swift 6.
 cd /path/to/MacTouch
 swift build
 swift test
+swift run MacTouchApp          # menu-bar UI (Phase 7)
+swift run MacTouchProbe --help # CLI
 ```
+
+## Phase 7 — menu-bar app
+
+```bash
+swift run MacTouchApp
+```
+
+Menu-bar popover: start/stop listening, single/double/triple counters, threshold/grouping/cooldown sliders, **Calibrate…** (same JSON as CLI). Settings path: `~/.config/MacTouch/settings.json`.
+
+Design notes: [docs/design/2026-08-17-menubar-app.md](docs/design/2026-08-17-menubar-app.md).
 
 ## Phase 1 — sensor probe
 
