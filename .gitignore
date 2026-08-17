@@ -10,3 +10,6 @@ DerivedData/
 
 # Local capture sessions (inspect before promoting anything into Fixtures/)
 /Recordings/
+
+# Git worktrees (local isolation)
+.worktrees/
