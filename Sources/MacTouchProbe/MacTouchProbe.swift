@@ -15,60 +15,33 @@ enum MacTouchProbe {
             exit(0)
         }
 
-        let duration = parseDouble(arguments, flag: "--duration") ?? 8.0
-        let printEvery = parseInt(arguments, flag: "--every") ?? 1
-        let recordURL = parsePath(arguments, flag: "--record")
-        let replayURL = parsePath(arguments, flag: "--replay")
-        let notes = parseString(arguments, flag: "--notes") ?? ""
-        let realtimeReplay = arguments.contains("--realtime")
-        let showProcessed = arguments.contains("--process")
-        let recognizeGestures = arguments.contains("--gestures")
-        // Gesture mode requires tap detection underneath.
-        let detectTaps = arguments.contains("--detect") || recognizeGestures
-        let groupingWindow = parseDouble(arguments, flag: "--grouping") ?? 0.40
-        let gestureCooldown = parseDouble(arguments, flag: "--gesture-cooldown") ?? 0.20
-
-        if recordURL != nil && replayURL != nil {
+        let options: MacTouchProbeOptions
+        switch MacTouchProbeOptions.parse(arguments: arguments) {
+        case .success(let parsed):
+            options = parsed
+        case .failure(.recordAndReplayBothSpecified):
             fputs("ERROR: use either --record or --replay, not both.\n", stderr)
+            exit(64)
+        case .failure(.missingValue(let flag)):
+            fputs("ERROR: missing value for \(flag).\n", stderr)
             exit(64)
         }
 
-        let options = ProbeOptions(
-            duration: duration,
-            printEvery: printEvery,
-            recordURL: recordURL,
-            notes: notes,
-            realtimeReplay: realtimeReplay,
-            showProcessed: showProcessed,
-            detectTaps: detectTaps,
-            recognizeGestures: recognizeGestures,
-            groupingWindow: groupingWindow,
-            gestureCooldown: gestureCooldown
-        )
+        if options.calibrate {
+            fputs("ERROR: --calibrate wizard not implemented yet.\n", stderr)
+            exit(64)
+        }
 
-        if let replayURL {
+        if let replayURL = options.replayURL {
             runReplay(url: replayURL, options: options)
         } else {
             runLive(options: options)
         }
     }
 
-    private struct ProbeOptions {
-        var duration: TimeInterval
-        var printEvery: Int
-        var recordURL: URL?
-        var notes: String
-        var realtimeReplay: Bool
-        var showProcessed: Bool
-        var detectTaps: Bool
-        var recognizeGestures: Bool
-        var groupingWindow: TimeInterval
-        var gestureCooldown: TimeInterval
-    }
-
     // MARK: - Live / record
 
-    private static func runLive(options: ProbeOptions) {
+    private static func runLive(options: MacTouchProbeOptions) {
         let service = SensorService()
 
         fputs("MacTouchProbe — live sensor capture (non-root)\n", stderr)
@@ -202,7 +175,7 @@ enum MacTouchProbe {
 
     // MARK: - Replay
 
-    private static func runReplay(url: URL, options: ProbeOptions) {
+    private static func runReplay(url: URL, options: MacTouchProbeOptions) {
         fputs("MacTouchProbe — offline replay (no HID / no elevation)\n", stderr)
 
         let recording: SensorRecording
@@ -281,7 +254,7 @@ enum MacTouchProbe {
         exit(0)
     }
 
-    private static func printPipelineSummary(_ pipeline: SamplePipeline, options: ProbeOptions) {
+    private static func printPipelineSummary(_ pipeline: SamplePipeline, options: MacTouchProbeOptions) {
         if options.detectTaps {
             fputs("Tap events detected: \(pipeline.tapCount)\n", stderr)
         }
@@ -321,6 +294,9 @@ enum MacTouchProbe {
           --grouping <sec>          Gesture grouping window (default 0.40)
           --gesture-cooldown <sec>  Idle after a gesture (default 0.20)
           --notes <text>            Optional note stored in the recording metadata
+          --calibrate               Run interactive calibration wizard (writes settings)
+          --config <path>           Load calibrated settings for gestures/detect
+          --config-out <path>       Write calibrated settings (default: ~/.config/MacTouch/settings.json)
           -h, --help                Show this help
 
         Timing tradeoff:
@@ -329,33 +305,6 @@ enum MacTouchProbe {
           Longer window = reliable multi-taps, laggy singles.
         """
         fputs(text + "\n", stdout)
-    }
-
-    private static func parseDouble(_ args: [String], flag: String) -> Double? {
-        guard let index = args.firstIndex(of: flag),
-              args.index(after: index) < args.endIndex,
-              let value = Double(args[args.index(after: index)]),
-              value > 0 else { return nil }
-        return value
-    }
-
-    private static func parseInt(_ args: [String], flag: String) -> Int? {
-        guard let index = args.firstIndex(of: flag),
-              args.index(after: index) < args.endIndex,
-              let value = Int(args[args.index(after: index)]),
-              value > 0 else { return nil }
-        return value
-    }
-
-    private static func parseString(_ args: [String], flag: String) -> String? {
-        guard let index = args.firstIndex(of: flag),
-              args.index(after: index) < args.endIndex else { return nil }
-        return args[args.index(after: index)]
-    }
-
-    private static func parsePath(_ args: [String], flag: String) -> URL? {
-        guard let value = parseString(args, flag: flag) else { return nil }
-        return URL(fileURLWithPath: value)
     }
 }
 
