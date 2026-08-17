@@ -27,6 +27,10 @@ let package = Package(
             dependencies: ["MacTouchCore"]
         ),
         .testTarget(
+            name: "MacTouchAppTests",
+            dependencies: ["MacTouchApp"]
+        ),
+        .testTarget(
             name: "MacTouchCoreTests",
             dependencies: ["MacTouchCore"]
         )

@@ -1,4 +1,5 @@
 import AppKit
+import MacTouchCore
 import SwiftUI
 
 struct ContentView: View {
@@ -9,7 +10,8 @@ struct ContentView: View {
             header
             counters
             settings
-            actions
+            shortcutActions
+            footerActions
             if let error = model.errorMessage {
                 Text(error)
                     .font(.caption)
@@ -147,7 +149,70 @@ struct ContentView: View {
         }
     }
 
-    private var actions: some View {
+    private var shortcutActions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Shortcut Actions")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle(
+                "Enable Shortcut Actions",
+                isOn: Binding(
+                    get: { model.actionSettings.enabled },
+                    set: { model.updateActionsEnabled($0) }
+                )
+            )
+            .toggleStyle(.switch)
+
+            shortcutRow(
+                title: "Single",
+                value: model.actionSettings.singleShortcutName ?? "",
+                kind: .single
+            )
+            shortcutRow(
+                title: "Double",
+                value: model.actionSettings.doubleShortcutName ?? "",
+                kind: .double
+            )
+            shortcutRow(
+                title: "Triple",
+                value: model.actionSettings.tripleShortcutName ?? "",
+                kind: .triple
+            )
+
+            labeledSlider(
+                "Action Cooldown",
+                value: model.actionSettings.cooldownSeconds,
+                range: 0.5...5.0,
+                format: "%.2f s"
+            ) { model.updateActionCooldown($0) }
+
+            Text(model.lastActionStatus)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func shortcutRow(title: String, value: String, kind: TapGestureKind) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .frame(width: 42, alignment: .leading)
+            TextField(
+                "Shortcut name",
+                text: Binding(
+                    get: { value },
+                    set: { model.updateShortcutName($0, for: kind) }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            Button("Run") {
+                model.runShortcutNow(kind)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private var footerActions: some View {
         HStack {
             Button("Calibrate…") {
                 model.beginCalibration()

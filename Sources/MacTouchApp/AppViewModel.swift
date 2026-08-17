@@ -12,9 +12,12 @@ final class AppViewModel {
     }
 
     private let store: SettingsStore
+    private let actionStore: ActionSettingsStore
     private let engine = ListeningEngine()
+    private let dispatcher: ShortcutActionDispatcher
 
     private(set) var settings: MacTouchSettings
+    private(set) var actionSettings: ActionSettings
     private(set) var phase: Phase = .idle
     private(set) var statusMessage = "Idle"
     private(set) var singleCount = 0
@@ -24,15 +27,24 @@ final class AppViewModel {
     private(set) var errorMessage: String?
     private(set) var calibrationProgress: CalibrationProgress?
     private(set) var showCalibrationSheet = false
+    private(set) var lastActionStatus = "—"
 
     private var calibrationService: CalibrationService?
     private var calibrationSensor: SensorService?
     private var calibrationStarted = false
-    private var saveTask: Task<Void, Never>?
+    private var saveSettingsTask: Task<Void, Never>?
+    private var saveActionsTask: Task<Void, Never>?
 
-    init(store: SettingsStore = SettingsStore()) {
+    init(
+        store: SettingsStore = SettingsStore(),
+        actionStore: ActionSettingsStore = ActionSettingsStore(),
+        dispatcher: ShortcutActionDispatcher = ShortcutActionDispatcher()
+    ) {
         self.store = store
+        self.actionStore = actionStore
+        self.dispatcher = dispatcher
         self.settings = store.loadOrDefault()
+        self.actionSettings = actionStore.loadOrDefault()
         wireEngine()
     }
 
@@ -69,17 +81,44 @@ final class AppViewModel {
 
     func updateThreshold(_ value: Double) {
         settings.minAbsoluteThresholdG = max(0.01, min(value, 1.0))
-        scheduleSaveAndMaybeReapply()
+        scheduleSettingsSaveAndMaybeReapply()
     }
 
     func updateGrouping(_ value: Double) {
         settings.groupingWindow = max(0.15, min(value, 1.0))
-        scheduleSaveAndMaybeReapply()
+        scheduleSettingsSaveAndMaybeReapply()
     }
 
     func updateCooldown(_ value: Double) {
         settings.gestureCooldown = max(0.05, min(value, 1.0))
-        scheduleSaveAndMaybeReapply()
+        scheduleSettingsSaveAndMaybeReapply()
+    }
+
+    func updateActionsEnabled(_ enabled: Bool) {
+        actionSettings.enabled = enabled
+        scheduleActionSettingsSave()
+    }
+
+    func updateActionCooldown(_ value: Double) {
+        actionSettings.cooldownSeconds = max(0.5, min(value, 5.0))
+        scheduleActionSettingsSave()
+    }
+
+    func updateShortcutName(_ value: String, for kind: TapGestureKind) {
+        let normalized = ActionSettings.normalizedName(value)
+        switch kind {
+        case .single:
+            actionSettings.singleShortcutName = normalized
+        case .double:
+            actionSettings.doubleShortcutName = normalized
+        case .triple:
+            actionSettings.tripleShortcutName = normalized
+        }
+        scheduleActionSettingsSave()
+    }
+
+    func runShortcutNow(_ kind: TapGestureKind) {
+        triggerShortcut(for: kind)
     }
 
     func beginCalibration() {
@@ -157,11 +196,12 @@ final class AppViewModel {
         }
         lastGestureSummary =
             "\(gesture.kind.title) · peak \(String(format: "%.3f", gesture.peakStrength)) g"
+        triggerShortcut(for: gesture.kind)
     }
 
-    private func scheduleSaveAndMaybeReapply() {
-        saveTask?.cancel()
-        saveTask = Task { @MainActor in
+    private func scheduleSettingsSaveAndMaybeReapply() {
+        saveSettingsTask?.cancel()
+        saveSettingsTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
             do {
@@ -172,6 +212,34 @@ final class AppViewModel {
             }
             if phase == .listening {
                 engine.apply(settings: settings)
+            }
+        }
+    }
+
+    private func scheduleActionSettingsSave() {
+        saveActionsTask?.cancel()
+        saveActionsTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            do {
+                try actionStore.save(actionSettings)
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func triggerShortcut(for kind: TapGestureKind) {
+        let currentSettings = actionSettings
+        Task { [dispatcher, weak self] in
+            let outcome = dispatcher.dispatch(gesture: kind, settings: currentSettings)
+            await MainActor.run {
+                guard let self else { return }
+                self.lastActionStatus = outcome.summary
+                if case .failed = outcome {
+                    self.errorMessage = outcome.summary
+                }
             }
         }
     }
