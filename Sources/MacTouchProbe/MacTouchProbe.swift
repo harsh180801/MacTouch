@@ -22,14 +22,16 @@ enum MacTouchProbe {
         case .failure(.recordAndReplayBothSpecified):
             fputs("ERROR: use either --record or --replay, not both.\n", stderr)
             exit(64)
+        case .failure(.calibrateWithRecordOrReplay):
+            fputs("ERROR: --calibrate cannot be combined with --record or --replay.\n", stderr)
+            exit(64)
         case .failure(.missingValue(let flag)):
             fputs("ERROR: missing value for \(flag).\n", stderr)
             exit(64)
         }
 
         if options.calibrate {
-            fputs("ERROR: --calibrate wizard not implemented yet.\n", stderr)
-            exit(64)
+            runCalibrate(configOut: options.configOutURL ?? MacTouchSettings.defaultConfigURL)
         }
 
         if let replayURL = options.replayURL {
@@ -59,16 +61,17 @@ enum MacTouchProbe {
             exit(2)
         }
 
-        fputs("Device present. Opening as current user (euid=\(geteuid()))…\n", stderr)
+        fputs("Device present.\n", stderr)
 
         let counter = SampleCounter()
         let collector = SampleCollector()
+        let pipelineConfiguration = loadPipelineConfiguration(options: options)
         let pipeline = SamplePipeline(
             showProcessed: options.showProcessed,
             detectTaps: options.detectTaps,
             recognizeGestures: options.recognizeGestures,
-            groupingWindow: options.groupingWindow,
-            gestureCooldown: options.gestureCooldown
+            tapDetectorConfig: pipelineConfiguration.tapDetector,
+            gestureRecognizerConfig: pipelineConfiguration.gestureRecognizer
         )
 
         service.onSample = { sample in
@@ -81,6 +84,7 @@ enum MacTouchProbe {
         }
 
         do {
+            fputs("Opening as current user (euid=\(geteuid()))…\n", stderr)
             try service.start()
         } catch {
             fputs("ERROR: \(error.localizedDescription)\n", stderr)
@@ -107,7 +111,7 @@ enum MacTouchProbe {
         }
         if options.recognizeGestures {
             fputs(
-                "Gesture recognition enabled (--gestures). grouping=\(String(format: "%.2f", options.groupingWindow))s cooldown=\(String(format: "%.2f", options.gestureCooldown))s\n",
+                "Gesture recognition enabled (--gestures). grouping=\(String(format: "%.2f", pipelineConfiguration.gestureRecognizer.groupingWindow))s cooldown=\(String(format: "%.2f", pipelineConfiguration.gestureRecognizer.cooldown))s\n",
                 stderr
             )
             fputs(
@@ -132,7 +136,7 @@ enum MacTouchProbe {
         }
 
         service.stop()
-        pipeline.flush(groupingWindow: options.groupingWindow)
+        pipeline.flush()
 
         let totals = counter.snapshot
         let collected = collector.samples
@@ -202,12 +206,13 @@ enum MacTouchProbe {
         )
 
         let counter = SampleCounter()
+        let pipelineConfiguration = loadPipelineConfiguration(options: options)
         let pipeline = SamplePipeline(
             showProcessed: options.showProcessed,
             detectTaps: options.detectTaps,
             recognizeGestures: options.recognizeGestures,
-            groupingWindow: options.groupingWindow,
-            gestureCooldown: options.gestureCooldown
+            tapDetectorConfig: pipelineConfiguration.tapDetector,
+            gestureRecognizerConfig: pipelineConfiguration.gestureRecognizer
         )
         let replayer = SensorReplayer(
             recording: recording,
@@ -248,10 +253,135 @@ enum MacTouchProbe {
         }
 
         let totals = counter.snapshot
-        pipeline.flush(groupingWindow: options.groupingWindow)
+        pipeline.flush()
         printPipelineSummary(pipeline, options: options)
         fputs("Replay done. samples=\(totals.total)\n", stderr)
         exit(0)
+    }
+
+    // MARK: - Calibration
+
+    private static func runCalibrate(configOut: URL) {
+        let service = SensorService()
+        let calibration = CalibrationRunner()
+        let state = CalibrationRunState()
+        let maxDuration: TimeInterval = 120
+
+        fputs("MacTouchProbe — live calibration wizard\n", stderr)
+        fputs("Looking for AppleSPUHIDDevice accel (page 0xFF00, usage 3)…\n", stderr)
+
+        guard service.isAvailable() else {
+            fputs(
+                """
+                ERROR: Accelerometer HID device not found.
+                This Mac may lack AppleSPUHIDDevice, or the IMU endpoint is missing.
+                Compatible class: Apple Silicon MacBook Pro / Air with SPU IMU.
+                """,
+                stderr
+            )
+            exit(2)
+        }
+
+        fputs("Device present. Opening as current user (euid=\(geteuid()))…\n", stderr)
+        fputs("Calibration will time out after \(Int(maxDuration))s if not completed.\n", stderr)
+        fputs("Light taps on the aluminum chassis are fine; do not strike the display.\n\n", stderr)
+
+        calibration.start(at: ProcessInfo.processInfo.systemUptime)
+        service.onSample = { sample in
+            let progress = calibration.ingest(sample)
+            state.record(progress: progress)
+        }
+
+        do {
+            try service.start()
+        } catch {
+            fputs("ERROR: \(error.localizedDescription)\n", stderr)
+            fputs(
+                """
+                Next steps (no automatic elevation):
+                1. System Settings → Privacy & Security → Input Monitoring — allow Terminal/Cursor if prompted.
+                2. Re-run this probe.
+                3. Only if open/stream still fails, we can discuss a privileged helper later.
+                """,
+                stderr
+            )
+            exit(1)
+        }
+
+        let runLoop = RunLoop.current
+        let endDate = Date().addingTimeInterval(maxDuration)
+        while Date() < endDate, !state.isDone, runLoop.run(mode: .default, before: Date().addingTimeInterval(0.05)) {
+        }
+
+        service.stop()
+
+        if state.sampleCount == 0 {
+            fputs(
+                """
+                ERROR: Device opened but zero samples arrived.
+                The SPU driver may still be asleep, blocked by permissions, or not streaming.
+                """,
+                stderr
+            )
+            exit(3)
+        }
+
+        if !state.isDone {
+            fputs("ERROR: calibration did not complete before timeout.\n", stderr)
+        }
+
+        do {
+            let settings = try calibration.finish()
+            printRecommendedSettings(settings, configOut: configOut)
+            try settings.save(to: configOut)
+            fputs("Wrote \(configOut.path)\n", stderr)
+            exit(0)
+        } catch is CalibrationAnalyzerError {
+            exit(7)
+        } catch is MacTouchSettingsError {
+            exit(8)
+        } catch {
+            fputs("ERROR: \(error.localizedDescription)\n", stderr)
+            exit(8)
+        }
+    }
+
+    private static func printRecommendedSettings(_ settings: MacTouchSettings, configOut: URL) {
+        print("Recommended settings:")
+        print("  minAbsoluteThresholdG=\(settings.minAbsoluteThresholdG)")
+        print("  groupingWindow=\(settings.groupingWindow)")
+        print("  gestureCooldown=\(settings.gestureCooldown)")
+        print("Suggested: swift run MacTouchProbe --gestures --config \(configOut.path)")
+    }
+
+    // MARK: - Pipeline configuration
+
+    private struct PipelineConfiguration {
+        var tapDetector: TapDetectorConfig
+        var gestureRecognizer: GestureRecognizerConfig
+    }
+
+    private static func loadPipelineConfiguration(options: MacTouchProbeOptions) -> PipelineConfiguration {
+        var tapDetector = TapDetectorConfig()
+        var gestureRecognizer = GestureRecognizerConfig(
+            groupingWindow: options.groupingWindow,
+            cooldown: options.gestureCooldown
+        )
+
+        guard (options.detectTaps || options.recognizeGestures), let configURL = options.configURL else {
+            return PipelineConfiguration(tapDetector: tapDetector, gestureRecognizer: gestureRecognizer)
+        }
+
+        do {
+            let settings = try MacTouchSettings.load(from: configURL)
+            settings.apply(to: &tapDetector)
+            settings.apply(to: &gestureRecognizer)
+            fputs("Loaded calibrated settings from \(configURL.path)\n", stderr)
+            return PipelineConfiguration(tapDetector: tapDetector, gestureRecognizer: gestureRecognizer)
+        } catch {
+            fputs("ERROR loading config \(configURL.path): \(error.localizedDescription)\n", stderr)
+            exit(8)
+        }
     }
 
     private static func printPipelineSummary(_ pipeline: SamplePipeline, options: MacTouchProbeOptions) {
@@ -278,6 +408,8 @@ enum MacTouchProbe {
           swift run MacTouchProbe --detect --duration 8 --every 100
           swift run MacTouchProbe --gestures --duration 12 --every 100
           swift run MacTouchProbe --gestures --grouping 0.35 --gesture-cooldown 0.25
+          swift run MacTouchProbe --calibrate --config-out ~/.config/MacTouch/settings.json
+          swift run MacTouchProbe --gestures --config ~/.config/MacTouch/settings.json
 
         Replay:
           swift run MacTouchProbe --replay Recordings/taps.csv --gestures
@@ -295,7 +427,7 @@ enum MacTouchProbe {
           --gesture-cooldown <sec>  Idle after a gesture (default 0.20)
           --notes <text>            Optional note stored in the recording metadata
           --calibrate               Run interactive calibration wizard (writes settings)
-          --config <path>           Load calibrated settings for gestures/detect
+          --config <path>           Load calibrated settings for gestures/detect (wins over CLI timing flags)
           --config-out <path>       Write calibrated settings (default: ~/.config/MacTouch/settings.json)
           -h, --help                Show this help
 
@@ -335,6 +467,65 @@ private final class SampleCounter: @unchecked Sendable {
     }
 }
 
+private final class CalibrationRunState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPrompt: String?
+    private var done = false
+    private var samples = 0
+
+    func record(progress: CalibrationProgress) {
+        lock.lock()
+        samples += 1
+        let shouldPrint = progress.prompt != lastPrompt
+        if shouldPrint {
+            lastPrompt = progress.prompt
+        }
+        if progress.stage == .done {
+            done = true
+        }
+        lock.unlock()
+
+        if shouldPrint {
+            fputs(progress.prompt + "\n", stderr)
+        }
+    }
+
+    var isDone: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return done
+    }
+
+    var sampleCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return samples
+    }
+}
+
+private final class CalibrationRunner: @unchecked Sendable {
+    private let lock = NSLock()
+    private let service = CalibrationService()
+
+    func start(at timestamp: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        service.start(at: timestamp)
+    }
+
+    func ingest(_ sample: SensorSample) -> CalibrationProgress {
+        lock.lock()
+        defer { lock.unlock() }
+        return service.ingest(sample)
+    }
+
+    func finish() throws -> MacTouchSettings {
+        lock.lock()
+        defer { lock.unlock() }
+        return try service.finish()
+    }
+}
+
 private final class SampleCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [SensorSample] = []
@@ -369,22 +560,17 @@ private final class SamplePipeline: @unchecked Sendable {
         showProcessed: Bool,
         detectTaps: Bool,
         recognizeGestures: Bool,
-        groupingWindow: TimeInterval,
-        gestureCooldown: TimeInterval
+        tapDetectorConfig: TapDetectorConfig = TapDetectorConfig(),
+        gestureRecognizerConfig: GestureRecognizerConfig = GestureRecognizerConfig()
     ) {
         self.showProcessed = showProcessed
         self.detectTaps = detectTaps
         self.recognizeGestures = recognizeGestures
         let needsProcessor = showProcessed || detectTaps || recognizeGestures
         self.processor = needsProcessor ? SignalProcessor() : nil
-        self.detector = (detectTaps || recognizeGestures) ? TapDetector() : nil
+        self.detector = (detectTaps || recognizeGestures) ? TapDetector(config: tapDetectorConfig) : nil
         self.gestures = recognizeGestures
-            ? GestureRecognizer(
-                config: GestureRecognizerConfig(
-                    groupingWindow: groupingWindow,
-                    cooldown: gestureCooldown
-                )
-            )
+            ? GestureRecognizer(config: gestureRecognizerConfig)
             : nil
     }
 
@@ -446,14 +632,13 @@ private final class SamplePipeline: @unchecked Sendable {
     }
 
     /// Finalize any open gesture after the stream ends (last single would otherwise hang).
-    func flush(groupingWindow: TimeInterval) {
+    func flush() {
         lock.lock()
         defer { lock.unlock() }
         guard let gestures else { return }
         if let gesture = gestures.flush() {
             recordGesture(gesture)
         }
-        _ = groupingWindow
     }
 }
 

@@ -24,4 +24,15 @@ struct MacTouchProbeOptionsTests {
         #expect(options.recognizeGestures == true)
         #expect(options.configURL?.path == "/tmp/in.json")
     }
+
+    @Test func rejectsCalibrateWithRecordOrReplay() {
+        #expect(
+            MacTouchProbeOptions.parse(arguments: ["--calibrate", "--record", "/tmp/out.csv"])
+                == .failure(.calibrateWithRecordOrReplay)
+        )
+        #expect(
+            MacTouchProbeOptions.parse(arguments: ["--calibrate", "--replay", "/tmp/in.csv"])
+                == .failure(.calibrateWithRecordOrReplay)
+        )
+    }
 }

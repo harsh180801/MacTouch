@@ -9,6 +9,7 @@ Native macOS tools that detect **physical taps/knocks on a MacBook aluminum chas
 - **Phase 3:** Signal processing — gravity removal, impact band filter, rolling noise baseline.
 - **Phase 4:** Tap detection — peak/decay, debounce, confidence, typing/motion rejection.
 - **Phase 5:** Gesture recognition — single / double / triple tap grouping.
+- **Phase 6:** Calibration — live wizard writes JSON settings for detector / gesture tuning.
 
 Later phases add calibration and a SwiftUI menu-bar app.
 
@@ -156,6 +157,20 @@ GESTURE single  taps=1  t=1.204  final=1.604  peak=0.0621  conf=0.55
 GESTURE double  taps=2  t=2.100  final=2.520  peak=0.0710  conf=0.61
 ```
 
+## Phase 6 — calibration
+
+The calibration wizard opens the live accelerometer, asks for idle time, single taps,
+and double taps, then writes recommended settings as JSON:
+
+```bash
+swift run MacTouchProbe --calibrate --config-out ~/.config/MacTouch/settings.json
+swift run MacTouchProbe --gestures --config ~/.config/MacTouch/settings.json --duration 15 --every 100
+```
+
+When `--config` is supplied for `--detect` or `--gestures`, calibrated settings are
+applied to the tap detector and gesture recognizer. Config values win over
+`--grouping` and `--gesture-cooldown`.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -167,6 +182,9 @@ GESTURE double  taps=2  t=2.100  final=2.520  peak=0.0710  conf=0.61
 | 4 | Failed to write recording |
 | 5 | Failed to read recording |
 | 6 | Realtime replay timed out |
+| 7 | Calibration incomplete / analyzer rejected samples |
+| 8 | Failed to load or save calibrated settings |
+| 64 | Invalid CLI usage |
 
 ## Project layout
 

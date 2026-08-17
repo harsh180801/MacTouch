@@ -2,6 +2,7 @@ import Foundation
 
 public enum MacTouchProbeOptionsError: Error, Equatable, Sendable {
     case recordAndReplayBothSpecified
+    case calibrateWithRecordOrReplay
     case missingValue(forFlag: String)
 }
 
@@ -41,6 +42,10 @@ public struct MacTouchProbeOptions: Equatable, Sendable {
 
         let recognizeGestures = arguments.contains("--gestures")
         let calibrate = arguments.contains("--calibrate")
+        if calibrate, recordURL != nil || replayURL != nil {
+            return .failure(.calibrateWithRecordOrReplay)
+        }
+
         let explicitConfigOut = parsePath(arguments, flag: "--config-out")
 
         var configOutURL: URL?
