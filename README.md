@@ -10,8 +10,7 @@ Native macOS tools that detect **physical taps/knocks on a MacBook aluminum chas
 - **Phase 4:** Tap detection — peak/decay, debounce, confidence, typing/motion rejection.
 - **Phase 5:** Gesture recognition — single / double / triple tap grouping.
 - **Phase 6:** Calibration — live wizard writes JSON settings for detector / gesture tuning.
-
-Later phases add calibration and a SwiftUI menu-bar app.
+- **Phase 7 (next):** SwiftUI menu-bar app — waveform, settings UI, calibration wizard.
 
 ## Compatibility
 
@@ -159,17 +158,36 @@ GESTURE double  taps=2  t=2.100  final=2.520  peak=0.0710  conf=0.61
 
 ## Phase 6 — calibration
 
-The calibration wizard opens the live accelerometer, asks for idle time, single taps,
-and double taps, then writes recommended settings as JSON:
+The calibration wizard opens the live accelerometer, guides three stages (idle →
+single taps → double taps), then writes recommended settings as JSON.
+
+Default settings path: `~/.config/MacTouch/settings.json`
 
 ```bash
+# Run wizard (writes settings; default --config-out is ~/.config/MacTouch/settings.json)
+swift run MacTouchProbe --calibrate
 swift run MacTouchProbe --calibrate --config-out ~/.config/MacTouch/settings.json
+
+# Apply calibrated settings to detect / gestures
 swift run MacTouchProbe --gestures --config ~/.config/MacTouch/settings.json --duration 15 --every 100
+swift run MacTouchProbe --detect --config ~/.config/MacTouch/settings.json --duration 10 --every 100
 ```
 
-When `--config` is supplied for `--detect` or `--gestures`, calibrated settings are
-applied to the tap detector and gesture recognizer. Config values win over
-`--grouping` and `--gesture-cooldown`.
+| Flag | Meaning |
+|------|---------|
+| `--calibrate` | Interactive wizard (live HID only; not combinable with `--record` / `--replay`) |
+| `--config <path>` | Load calibrated settings for `--detect` or `--gestures` |
+| `--config-out <path>` | Write wizard output (default `~/.config/MacTouch/settings.json`) |
+
+When `--config` is supplied, calibrated `minAbsoluteThresholdG`, `groupingWindow`, and
+`gestureCooldown` are applied to the tap detector and gesture recognizer. Config values
+win over `--grouping` and `--gesture-cooldown`.
+
+**Timing note:** during the doubles stage the wizard prompts for double-taps about
+**~0.15 s apart** (typical inter-tap spacing). The analyzer derives `groupingWindow`
+from your measured gaps (median × 1.8, clamped 0.22–0.45 s) and sets `gestureCooldown`
+from that window. Singles are still delayed by the grouping window after calibration —
+that tradeoff remains; calibration tunes it to your tap rhythm rather than removing it.
 
 ### Exit codes
 
@@ -192,7 +210,9 @@ applied to the tap detector and gesture recognizer. Config values win over
 Sources/MacTouchCore/Sensor/      HID access, recording, replay
 Sources/MacTouchCore/Signal/      Magnitude, filters, SignalProcessor
 Sources/MacTouchCore/Detection/   TapDetector, GestureRecognizer
-Sources/MacTouchProbe/            CLI (live / record / replay / process / detect / gestures)
+Sources/MacTouchCore/Calibration/ CalibrationService, CalibrationSession, CalibrationAnalyzer
+Sources/MacTouchCore/Settings/    MacTouchSettings (JSON load/save)
+Sources/MacTouchProbe/            CLI (live / record / replay / process / detect / gestures / calibrate)
 Tests/MacTouchCoreTests/          Unit tests
 Fixtures/recordings/             Scrubbed fixtures only (after privacy review)
 Recordings/                       Local captures (gitignored)

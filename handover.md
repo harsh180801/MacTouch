@@ -1,6 +1,6 @@
 # MacTouch handover
 
-Handoff document for continuing MacTouch development after Phases 1–5.
+Handoff document for continuing MacTouch development after Phases 1–6.
 
 **Date:** 2026-08-16  
 **Workspace:** `/Users/harsh/.cursor/MacTouch`  
@@ -22,7 +22,7 @@ Design goals (from the original brief):
 
 ---
 
-## Current status (Phases 1–5 complete)
+## Current status (Phases 1–6 complete)
 
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
@@ -31,11 +31,13 @@ Design goals (from the original brief):
 | 3 Signal processing | Done | Gravity remove, HP/LP, noise floor |
 | 4 Tap detection | Done | Peak/decay/debounce/confidence |
 | 5 Gestures | Done | Single / double / triple grouping |
-| 6 Calibration | **Not started** | Recommended thresholds from live samples |
+| 6 Calibration | **Done** | Live wizard → `MacTouchSettings` JSON |
 | 7 SwiftUI menu bar | **Not started** | Waveform, settings, counters, test mode |
 | 8 Actions | **Not started** | Mute, Shortcuts, launch app, notify |
 
-**Tests:** `swift test` — 33 tests passing (as of this handover).
+**Tests:** run `swift test` before starting new work (full suite includes calibration + settings tests).
+
+**Settings path:** calibrated JSON defaults to `~/.config/MacTouch/settings.json` (`MacTouchSettings.defaultConfigURL`).
 
 **Privilege policy:** Non-root first. On the development Mac, HID open + streaming worked as a normal user (euid 501). Do not add `sudo` unless open/stream fails and you document why.
 
@@ -53,6 +55,8 @@ Sources/MacTouchCore/
                             SensorRecording, SensorReplayer
   Signal/                   SignalProcessor (+ filters)
   Detection/                TapDetector, GestureRecognizer
+  Calibration/              CalibrationService, CalibrationSession, CalibrationAnalyzer
+  Settings/                 MacTouchSettings (Codable JSON load/save)
 Sources/MacTouchProbe/      CLI entry point
 Tests/MacTouchCoreTests/
 Fixtures/recordings/        Scrubbed fixtures only (after privacy review)
@@ -89,35 +93,44 @@ swift run MacTouchProbe --detect --duration 10 --every 100
 # Gestures (single/double/triple)
 swift run MacTouchProbe --gestures --duration 12 --every 100
 swift run MacTouchProbe --gestures --grouping 0.28 --gesture-cooldown 0.20
+
+# Calibration wizard → settings JSON
+swift run MacTouchProbe --calibrate
+swift run MacTouchProbe --calibrate --config-out ~/.config/MacTouch/settings.json
+
+# Apply calibrated settings
+swift run MacTouchProbe --gestures --config ~/.config/MacTouch/settings.json --duration 15 --every 100
 ```
 
 Light taps on palm rest / lid edge only. Do not strike the display.
+
+**Calibration prompts:** idle (keep still) → five single taps (~1 s apart) → five double-taps (~0.15 s apart). Exit code **7** if incomplete or analyzer rejects samples; **8** if settings JSON load/save fails.
 
 ---
 
 ## Known issues / open problems
 
-### 1. Single vs double gesture confusion (active)
+### 1. Single vs double gesture confusion (mitigated by Phase 6)
 
-Users report trouble distinguishing **single** and **double** taps.
+Users may still confuse **single** and **double** taps if they have not run calibration or tap outside the measured rhythm.
 
 **Cause:** Phase 5 grouping window tradeoff + real tap spacing.
 
 - Default `--grouping 0.40` merges taps closer than 400 ms into one multi-tap gesture.
-- Three taps ~120 ms apart in a recording became one **triple**.
 - Singles are intentionally delayed by the grouping window so a second tap can still arrive.
 
-**What Phase 6 (calibration) will help with:**
+**Phase 6 mitigation:**
 
-- Measure the user’s inter-tap intervals
-- Recommend a better `groupingWindow`, threshold, and cooldown
+- Run `swift run MacTouchProbe --calibrate` to measure idle noise, single peaks, and double gaps.
+- Wizard recommends `minAbsoluteThresholdG`, `groupingWindow`, and `gestureCooldown` written to `~/.config/MacTouch/settings.json`.
+- Use `--config` with `--gestures` / `--detect` so calibrated values override CLI timing flags.
 
-**What Phase 6 will not magically remove:**
+**What calibration does not remove:**
 
 - The need to wait before finalizing a single
 - 100% accuracy for every tap style
 
-**Manual workaround until Phase 6:**
+**Manual workaround (without calibration):**
 
 ```bash
 # Tighter grouping if separate singles are being merged
@@ -137,7 +150,7 @@ Early Phase 4 defaults were too aggressive for light chassis taps. Fixed by:
 - Not including the tap itself in sustained-motion rejection
 - Excluding the rising-edge tail from the pre-impact quiet check
 
-If detection regresses on another Mac model, re-tune with a short `--record` + analysis before changing defaults globally.
+If detection regresses on another Mac model, re-tune with `--calibrate` or a short `--record` + analysis before changing defaults globally.
 
 ### 3. Undocumented Apple API risk
 
@@ -149,21 +162,17 @@ If detection regresses on another Mac model, re-tune with a short `--record` + a
 
 ---
 
-## Recommended next work (Phase 6+)
+## Recommended next work (Phase 7+)
 
-1. **Phase 6 — CalibrationService**
-   - Guided capture: idle, typing, trackpad, intentional taps
-   - Recommend `detectionThreshold` / grouping / cooldown
-   - Persist settings (later `AppSettings` / UserDefaults)
-
-2. **Phase 7 — SwiftUI menu-bar app**
+1. **Phase 7 — SwiftUI menu-bar app**
    - Start/stop, waveform, sensor status
-   - Sensitivity / threshold / grouping / cooldown controls
-   - Calibration wizard UI
+   - Sensitivity / threshold / grouping / cooldown controls bound to `MacTouchSettings`
+   - Calibration wizard UI (reuse `CalibrationService` / session stages)
    - Single/double/triple counters + debug event log
    - Test mode (no system actions)
+   - Load/save `~/.config/MacTouch/settings.json`
 
-3. **Phase 8 — Actions** (only after detection is reliable)
+2. **Phase 8 — Actions** (only after detection is reliable)
    - Mute, Shortcuts, launch app, notification
    - Explicit confirmation before arbitrary shell
 
@@ -179,9 +188,14 @@ SensorService (IOKit HID)
         → SignalProcessor → ProcessedSample
             → TapDetector → TapEvent
                 → GestureRecognizer → TapGestureEvent (single/double/triple)
+
+CalibrationService (live only)
+    → CalibrationSession (idle → singles → doubles)
+        → CalibrationAnalyzer.recommend → MacTouchSettings → ~/.config/MacTouch/settings.json
+            → applied to TapDetectorConfig / GestureRecognizerConfig via --config
 ```
 
-Replay path: `SensorRecordingIO` / `SensorReplayer` feeds the same pipeline without HID.
+Replay path: `SensorRecordingIO` / `SensorReplayer` feeds the same pipeline without HID. Calibration is live-only (no `--replay --calibrate`).
 
 ---
 
@@ -212,4 +226,4 @@ Hardware constants (community-documented):
 - Unit-test signal math and gesture timing; use recordings for replay tests.
 - Preserve third-party attribution.
 
-When resuming: read this file + `README.md`, run `swift test`, then start **Phase 6** unless the user redirects.
+When resuming: read this file + `README.md`, run `swift test`, then start **Phase 7** unless the user redirects.
