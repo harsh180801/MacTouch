@@ -120,6 +120,32 @@ final class AppViewModel {
         scheduleActionSettingsSave()
     }
 
+    func updateAppName(_ value: String, for kind: TapGestureKind) {
+        let normalized = ActionSettings.normalizedName(value)
+        if normalized != nil {
+            actionSettings.setActionKind(.launchApp, for: kind)
+        }
+        switch kind {
+        case .single:
+            actionSettings.singleAppName = normalized
+        case .double:
+            actionSettings.doubleAppName = normalized
+        case .triple:
+            actionSettings.tripleAppName = normalized
+        }
+        scheduleActionSettingsSave()
+    }
+
+    func updateNotificationTitle(_ value: String) {
+        actionSettings.notificationTitle = value
+        scheduleActionSettingsSave()
+    }
+
+    func updateNotificationBody(_ value: String) {
+        actionSettings.notificationBody = value
+        scheduleActionSettingsSave()
+    }
+
     func actionKind(for kind: TapGestureKind) -> GestureActionKind {
         actionSettings.actionKind(for: kind)
     }

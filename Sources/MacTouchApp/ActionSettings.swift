@@ -5,6 +5,8 @@ enum GestureActionKind: String, Codable, CaseIterable, Equatable, Sendable {
     case none
     case shortcut
     case toggleMute
+    case launchApp
+    case notify
 }
 
 struct ActionSettings: Codable, Equatable, Sendable {
@@ -12,16 +14,42 @@ struct ActionSettings: Codable, Equatable, Sendable {
     var singleShortcutName: String?
     var doubleShortcutName: String?
     var tripleShortcutName: String?
+    var singleAppName: String?
+    var doubleAppName: String?
+    var tripleAppName: String?
+    var notificationTitle: String
+    var notificationBody: String
     var singleActionKind: GestureActionKind?
     var doubleActionKind: GestureActionKind?
     var tripleActionKind: GestureActionKind?
     var cooldownSeconds: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled
+        case singleShortcutName
+        case doubleShortcutName
+        case tripleShortcutName
+        case singleAppName
+        case doubleAppName
+        case tripleAppName
+        case notificationTitle
+        case notificationBody
+        case singleActionKind
+        case doubleActionKind
+        case tripleActionKind
+        case cooldownSeconds
+    }
 
     init(
         enabled: Bool = false,
         singleShortcutName: String? = nil,
         doubleShortcutName: String? = nil,
         tripleShortcutName: String? = nil,
+        singleAppName: String? = nil,
+        doubleAppName: String? = nil,
+        tripleAppName: String? = nil,
+        notificationTitle: String = "MacTouch",
+        notificationBody: String = "Gesture action triggered",
         singleActionKind: GestureActionKind? = nil,
         doubleActionKind: GestureActionKind? = nil,
         tripleActionKind: GestureActionKind? = nil,
@@ -31,19 +59,68 @@ struct ActionSettings: Codable, Equatable, Sendable {
         self.singleShortcutName = ActionSettings.normalizedName(singleShortcutName)
         self.doubleShortcutName = ActionSettings.normalizedName(doubleShortcutName)
         self.tripleShortcutName = ActionSettings.normalizedName(tripleShortcutName)
+        self.singleAppName = ActionSettings.normalizedName(singleAppName)
+        self.doubleAppName = ActionSettings.normalizedName(doubleAppName)
+        self.tripleAppName = ActionSettings.normalizedName(tripleAppName)
+        self.notificationTitle = notificationTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.notificationBody = notificationBody.trimmingCharacters(in: .whitespacesAndNewlines)
         self.singleActionKind = singleActionKind
         self.doubleActionKind = doubleActionKind
         self.tripleActionKind = tripleActionKind
         self.cooldownSeconds = cooldownSeconds
     }
 
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        singleShortcutName = ActionSettings.normalizedName(
+            try container.decodeIfPresent(String.self, forKey: .singleShortcutName)
+        )
+        doubleShortcutName = ActionSettings.normalizedName(
+            try container.decodeIfPresent(String.self, forKey: .doubleShortcutName)
+        )
+        tripleShortcutName = ActionSettings.normalizedName(
+            try container.decodeIfPresent(String.self, forKey: .tripleShortcutName)
+        )
+        singleAppName = ActionSettings.normalizedName(
+            try container.decodeIfPresent(String.self, forKey: .singleAppName)
+        )
+        doubleAppName = ActionSettings.normalizedName(
+            try container.decodeIfPresent(String.self, forKey: .doubleAppName)
+        )
+        tripleAppName = ActionSettings.normalizedName(
+            try container.decodeIfPresent(String.self, forKey: .tripleAppName)
+        )
+        notificationTitle = (
+            try container.decodeIfPresent(String.self, forKey: .notificationTitle)
+            ?? "MacTouch"
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        notificationBody = (
+            try container.decodeIfPresent(String.self, forKey: .notificationBody)
+            ?? "Gesture action triggered"
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        singleActionKind = try container.decodeIfPresent(GestureActionKind.self, forKey: .singleActionKind)
+        doubleActionKind = try container.decodeIfPresent(GestureActionKind.self, forKey: .doubleActionKind)
+        tripleActionKind = try container.decodeIfPresent(GestureActionKind.self, forKey: .tripleActionKind)
+        cooldownSeconds = try container.decodeIfPresent(Double.self, forKey: .cooldownSeconds) ?? 1.2
+    }
+
     mutating func normalize() {
         singleShortcutName = ActionSettings.normalizedName(singleShortcutName)
         doubleShortcutName = ActionSettings.normalizedName(doubleShortcutName)
         tripleShortcutName = ActionSettings.normalizedName(tripleShortcutName)
+        singleAppName = ActionSettings.normalizedName(singleAppName)
+        doubleAppName = ActionSettings.normalizedName(doubleAppName)
+        tripleAppName = ActionSettings.normalizedName(tripleAppName)
+        notificationTitle = notificationTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        notificationBody = notificationBody.trimmingCharacters(in: .whitespacesAndNewlines)
+
         if actionKind(for: .single) != .shortcut { singleShortcutName = nil }
         if actionKind(for: .double) != .shortcut { doubleShortcutName = nil }
         if actionKind(for: .triple) != .shortcut { tripleShortcutName = nil }
+        if actionKind(for: .single) != .launchApp { singleAppName = nil }
+        if actionKind(for: .double) != .launchApp { doubleAppName = nil }
+        if actionKind(for: .triple) != .launchApp { tripleAppName = nil }
     }
 
     func shortcutName(for kind: TapGestureKind) -> String? {
@@ -51,6 +128,14 @@ struct ActionSettings: Codable, Equatable, Sendable {
         case .single: singleShortcutName
         case .double: doubleShortcutName
         case .triple: tripleShortcutName
+        }
+    }
+
+    func appName(for kind: TapGestureKind) -> String? {
+        switch kind {
+        case .single: singleAppName
+        case .double: doubleAppName
+        case .triple: tripleAppName
         }
     }
 
@@ -76,6 +161,13 @@ struct ActionSettings: Codable, Equatable, Sendable {
             case .single: singleShortcutName = nil
             case .double: doubleShortcutName = nil
             case .triple: tripleShortcutName = nil
+            }
+        }
+        if newValue != .launchApp {
+            switch kind {
+            case .single: singleAppName = nil
+            case .double: doubleAppName = nil
+            case .triple: tripleAppName = nil
             }
         }
     }

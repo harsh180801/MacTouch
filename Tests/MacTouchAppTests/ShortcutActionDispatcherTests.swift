@@ -19,13 +19,48 @@ private struct StubMuteToggler: SystemMuteToggling {
     }
 }
 
+private struct StubAppOpener: AppOpening {
+    var handler: @Sendable (String) throws -> Void
+
+    func openApp(named appName: String) throws {
+        try handler(appName)
+    }
+}
+
+private struct StubNotifier: UserNotifying {
+    var handler: @Sendable (String, String) throws -> Void
+
+    func notify(title: String, body: String) throws {
+        try handler(title, body)
+    }
+}
+
+private final class NotificationCaptureBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: (String, String)?
+
+    func set(_ newValue: (String, String)) {
+        lock.lock()
+        value = newValue
+        lock.unlock()
+    }
+
+    func get() -> (String, String)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 struct ShortcutActionDispatcherTests {
     @Test func skipsWhenDisabled() {
         let dispatcher = ShortcutActionDispatcher(
             runner: StubRunner { _ in
                 ShortcutRunResult(exitCode: 0, stdout: "", stderr: "")
             },
-            muteToggler: StubMuteToggler { false }
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
         )
         let settings = ActionSettings(
             enabled: false,
@@ -41,7 +76,9 @@ struct ShortcutActionDispatcherTests {
             runner: StubRunner { _ in
                 ShortcutRunResult(exitCode: 0, stdout: "", stderr: "")
             },
-            muteToggler: StubMuteToggler { false }
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
         )
         let settings = ActionSettings(enabled: true, cooldownSeconds: 1.0)
         let outcome = dispatcher.dispatch(gesture: .double, settings: settings, now: 10)
@@ -53,7 +90,9 @@ struct ShortcutActionDispatcherTests {
             runner: StubRunner { _ in
                 ShortcutRunResult(exitCode: 0, stdout: "", stderr: "")
             },
-            muteToggler: StubMuteToggler { false }
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
         )
         let settings = ActionSettings(
             enabled: true,
@@ -72,7 +111,9 @@ struct ShortcutActionDispatcherTests {
             runner: StubRunner { _ in
                 ShortcutRunResult(exitCode: 1, stdout: "", stderr: "No Shortcut found")
             },
-            muteToggler: StubMuteToggler { false }
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
         )
         let settings = ActionSettings(
             enabled: true,
@@ -91,7 +132,9 @@ struct ShortcutActionDispatcherTests {
             runner: StubRunner { _ in
                 throw TestError.boom
             },
-            muteToggler: StubMuteToggler { false }
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
         )
         let settings = ActionSettings(
             enabled: true,
@@ -112,7 +155,9 @@ struct ShortcutActionDispatcherTests {
             runner: StubRunner { _ in
                 ShortcutRunResult(exitCode: 0, stdout: "", stderr: "")
             },
-            muteToggler: StubMuteToggler { true }
+            muteToggler: StubMuteToggler { true },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
         )
         let settings = ActionSettings(
             enabled: true,
@@ -121,5 +166,45 @@ struct ShortcutActionDispatcherTests {
         )
         let outcome = dispatcher.dispatch(gesture: .single, settings: settings, now: 10)
         #expect(outcome == .success(action: "Output mute toggled on"))
+    }
+
+    @Test func launchesAppWhenConfigured() {
+        let dispatcher = ShortcutActionDispatcher(
+            runner: StubRunner { _ in ShortcutRunResult(exitCode: 0, stdout: "", stderr: "") },
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { _, _ in }
+        )
+        let settings = ActionSettings(
+            enabled: true,
+            doubleAppName: "Safari",
+            doubleActionKind: .launchApp,
+            cooldownSeconds: 1.0
+        )
+        let outcome = dispatcher.dispatch(gesture: .double, settings: settings, now: 11)
+        #expect(outcome == .success(action: "App launched: Safari"))
+    }
+
+    @Test func showsNotificationWhenConfigured() {
+        let captured = NotificationCaptureBox()
+        let dispatcher = ShortcutActionDispatcher(
+            runner: StubRunner { _ in ShortcutRunResult(exitCode: 0, stdout: "", stderr: "") },
+            muteToggler: StubMuteToggler { false },
+            appOpener: StubAppOpener { _ in },
+            notifier: StubNotifier { title, body in
+                captured.set((title, body))
+            }
+        )
+        let settings = ActionSettings(
+            enabled: true,
+            notificationTitle: "MacTouch",
+            notificationBody: "Triggered",
+            tripleActionKind: .notify,
+            cooldownSeconds: 1.0
+        )
+        let outcome = dispatcher.dispatch(gesture: .triple, settings: settings, now: 12)
+        #expect(outcome == .success(action: "Notification shown"))
+        #expect(captured.get()?.0 == "MacTouch")
+        #expect(captured.get()?.1 == "Triggered")
     }
 }

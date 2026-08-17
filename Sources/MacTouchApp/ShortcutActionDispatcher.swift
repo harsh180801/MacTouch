@@ -16,6 +16,14 @@ protocol SystemMuteToggling: Sendable {
     func toggleOutputMute() throws -> Bool
 }
 
+protocol AppOpening: Sendable {
+    func openApp(named appName: String) throws
+}
+
+protocol UserNotifying: Sendable {
+    func notify(title: String, body: String) throws
+}
+
 struct ProcessShortcutRunner: ShortcutCommandRunning {
     func runShortcut(named name: String) throws -> ShortcutRunResult {
         let process = Process()
@@ -77,6 +85,55 @@ struct ProcessMuteToggler: SystemMuteToggling {
     }
 }
 
+struct ProcessAppOpener: AppOpening {
+    func openApp(named appName: String) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", appName]
+        let errPipe = Pipe()
+        process.standardError = errPipe
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            let message = String(data: errData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw NSError(
+                domain: "MacTouchLaunch",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: message?.isEmpty == false ? message! : "open exit \(process.terminationStatus)"]
+            )
+        }
+    }
+}
+
+struct ProcessNotifier: UserNotifying {
+    func notify(title: String, body: String) throws {
+        let escapedTitle = title.replacingOccurrences(of: "\"", with: "\\\"")
+        let escapedBody = body.replacingOccurrences(of: "\"", with: "\\\"")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = [
+            "-e",
+            "display notification \"\(escapedBody)\" with title \"\(escapedTitle)\""
+        ]
+        let errPipe = Pipe()
+        process.standardError = errPipe
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            let message = String(data: errData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw NSError(
+                domain: "MacTouchNotify",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: message?.isEmpty == false ? message! : "osascript exit \(process.terminationStatus)"]
+            )
+        }
+    }
+}
+
 enum ShortcutActionOutcome: Equatable, Sendable {
     enum SkipReason: String, Equatable, Sendable {
         case disabled
@@ -104,16 +161,22 @@ enum ShortcutActionOutcome: Equatable, Sendable {
 final class ShortcutActionDispatcher: @unchecked Sendable {
     private let runner: ShortcutCommandRunning
     private let muteToggler: SystemMuteToggling
+    private let appOpener: AppOpening
+    private let notifier: UserNotifying
     private let lock = NSLock()
     private var running = false
     private var lastRunAt: TimeInterval?
 
     init(
         runner: ShortcutCommandRunning = ProcessShortcutRunner(),
-        muteToggler: SystemMuteToggling = ProcessMuteToggler()
+        muteToggler: SystemMuteToggling = ProcessMuteToggler(),
+        appOpener: AppOpening = ProcessAppOpener(),
+        notifier: UserNotifying = ProcessNotifier()
     ) {
         self.runner = runner
         self.muteToggler = muteToggler
+        self.appOpener = appOpener
+        self.notifier = notifier
     }
 
     func dispatch(
@@ -127,10 +190,14 @@ final class ShortcutActionDispatcher: @unchecked Sendable {
 
         let actionKind = settings.actionKind(for: kind)
         let shortcutName = settings.shortcutName(for: kind)
+        let appName = settings.appName(for: kind)
         if actionKind == .none {
             return .skipped(reason: .unmapped)
         }
         if actionKind == .shortcut, shortcutName == nil {
+            return .skipped(reason: .unmapped)
+        }
+        if actionKind == .launchApp, appName == nil {
             return .skipped(reason: .unmapped)
         }
 
@@ -169,6 +236,15 @@ final class ShortcutActionDispatcher: @unchecked Sendable {
             case .toggleMute:
                 let muted = try muteToggler.toggleOutputMute()
                 return .success(action: "Output mute toggled \(muted ? "on" : "off")")
+            case .launchApp:
+                let name = appName ?? "App"
+                try appOpener.openApp(named: name)
+                return .success(action: "App launched: \(name)")
+            case .notify:
+                let title = settings.notificationTitle.isEmpty ? "MacTouch" : settings.notificationTitle
+                let body = settings.notificationBody.isEmpty ? "Gesture action triggered" : settings.notificationBody
+                try notifier.notify(title: title, body: body)
+                return .success(action: "Notification shown")
             }
         } catch {
             switch actionKind {
@@ -179,6 +255,11 @@ final class ShortcutActionDispatcher: @unchecked Sendable {
                 return .failed(action: "Shortcut: \(name)", reason: error.localizedDescription)
             case .toggleMute:
                 return .failed(action: "Output mute toggle", reason: error.localizedDescription)
+            case .launchApp:
+                let name = appName ?? "App"
+                return .failed(action: "App launch: \(name)", reason: error.localizedDescription)
+            case .notify:
+                return .failed(action: "Notification", reason: error.localizedDescription)
             }
         }
     }

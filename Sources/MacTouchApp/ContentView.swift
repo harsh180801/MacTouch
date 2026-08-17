@@ -184,6 +184,29 @@ struct ContentView: View {
                 format: "%.2f s"
             ) { model.updateActionCooldown($0) }
 
+            if model.actionKind(for: .single) == .notify
+                || model.actionKind(for: .double) == .notify
+                || model.actionKind(for: .triple) == .notify
+            {
+                TextField(
+                    "Notification title",
+                    text: Binding(
+                        get: { model.actionSettings.notificationTitle },
+                        set: { model.updateNotificationTitle($0) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+
+                TextField(
+                    "Notification body",
+                    text: Binding(
+                        get: { model.actionSettings.notificationBody },
+                        set: { model.updateNotificationBody($0) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+            }
+
             Text(model.lastActionStatus)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -206,9 +229,11 @@ struct ContentView: View {
                 Text("None").tag(GestureActionKind.none)
                 Text("Shortcut").tag(GestureActionKind.shortcut)
                 Text("Mute").tag(GestureActionKind.toggleMute)
+                Text("Launch App").tag(GestureActionKind.launchApp)
+                Text("Notify").tag(GestureActionKind.notify)
             }
             .labelsHidden()
-            .frame(width: 94)
+            .frame(width: 116)
 
             if actionKind == .shortcut {
                 TextField(
@@ -219,8 +244,18 @@ struct ContentView: View {
                     )
                 )
                 .textFieldStyle(.roundedBorder)
+            } else if actionKind == .launchApp {
+                let appName = model.actionSettings.appName(for: kind) ?? ""
+                TextField(
+                    "App name",
+                    text: Binding(
+                        get: { appName },
+                        set: { model.updateAppName($0, for: kind) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
             } else {
-                Text(actionKind == .toggleMute ? "Toggle output mute" : "No action")
+                Text(description(for: actionKind))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -229,6 +264,19 @@ struct ContentView: View {
                 model.runShortcutNow(kind)
             }
             .buttonStyle(.bordered)
+        }
+    }
+
+    private func description(for actionKind: GestureActionKind) -> String {
+        switch actionKind {
+        case .none:
+            return "No action"
+        case .toggleMute:
+            return "Toggle output mute"
+        case .notify:
+            return "Show local notification"
+        case .shortcut, .launchApp:
+            return ""
         }
     }
 
