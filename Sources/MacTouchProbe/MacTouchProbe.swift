@@ -323,7 +323,7 @@ enum MacTouchProbe {
                 """,
                 stderr
             )
-            exit(3)
+            exit(7)
         }
 
         if !state.isDone {
