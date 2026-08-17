@@ -224,9 +224,11 @@ Sources/MacTouchCore/Sensor/      HID access, recording, replay
 Sources/MacTouchCore/Signal/      Magnitude, filters, SignalProcessor
 Sources/MacTouchCore/Detection/   TapDetector, GestureRecognizer
 Sources/MacTouchCore/Calibration/ CalibrationService, CalibrationSession, CalibrationAnalyzer
-Sources/MacTouchCore/Settings/    MacTouchSettings (JSON load/save)
+Sources/MacTouchCore/Settings/    MacTouchSettings, SettingsStore (JSON)
 Sources/MacTouchProbe/            CLI (live / record / replay / process / detect / gestures / calibrate)
+Sources/MacTouchApp/              SwiftUI menu-bar app (Phase 7 MVP)
 Tests/MacTouchCoreTests/          Unit tests
+docs/design/                      Product design docs (not Superpowers)
 Fixtures/recordings/             Scrubbed fixtures only (after privacy review)
 Recordings/                       Local captures (gitignored)
 ```
