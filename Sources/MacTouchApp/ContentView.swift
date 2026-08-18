@@ -8,6 +8,7 @@ struct ContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            waveformPanel
             counters
             settings
             shortcutActions
@@ -78,6 +79,32 @@ struct ContentView: View {
             .buttonStyle(.borderless)
             .font(.caption)
         }
+    }
+
+    private var waveformPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Signal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Circle()
+                    .fill(model.isListening ? .green : .gray)
+                    .frame(width: 8, height: 8)
+                Text(model.isListening ? "Live" : "Idle")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            WaveformSparkline(values: model.waveformPoints)
+                .frame(height: 54)
+                .animation(.linear(duration: 0.15), value: model.waveformPoints)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        )
     }
 
     private func counter(_ title: String, _ value: Int) -> some View {
@@ -294,5 +321,98 @@ struct ContentView: View {
             }
             .keyboardShortcut("q")
         }
+    }
+}
+
+private struct WaveformSparkline: View {
+    let values: [Double]
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
+            let points = makePoints(width: width, height: height)
+
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.04))
+
+                if points.count > 1 {
+                    fillPath(points: points, height: height)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.34),
+                                Color.accentColor.opacity(0.05)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                    curvePath(points: points)
+                        .stroke(Color.accentColor.opacity(0.32), style: StrokeStyle(lineWidth: 4.8, lineCap: .round, lineJoin: .round))
+                        .blur(radius: 1.8)
+
+                    curvePath(points: points)
+                        .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round))
+                } else {
+                    Text("Waiting for samples…")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 6)
+                        .padding(.bottom, 4)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+    }
+
+    private func makePoints(width: Double, height: Double) -> [CGPoint] {
+        guard values.count > 1 else { return [] }
+        let denominator = Double(max(values.count - 1, 1))
+        let verticalInset = max(3.0, height * 0.08)
+        return values.enumerated().map { index, value in
+            let x = (Double(index) / denominator) * width
+            let drawableHeight = max(1, height - (verticalInset * 2))
+            let y = verticalInset + max(0, min(drawableHeight, (1.0 - value) * drawableHeight))
+            return CGPoint(x: x, y: y)
+        }
+    }
+
+    private func curvePath(points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        guard points.count > 2 else {
+            for point in points.dropFirst() {
+                path.addLine(to: point)
+            }
+            return path
+        }
+
+        for index in 1..<points.count {
+            let previous = points[index - 1]
+            let current = points[index]
+            let midpoint = CGPoint(
+                x: (previous.x + current.x) / 2,
+                y: (previous.y + current.y) / 2
+            )
+            path.addQuadCurve(to: midpoint, control: previous)
+        }
+
+        if let last = points.last {
+            path.addLine(to: last)
+        }
+        return path
+    }
+
+    private func fillPath(points: [CGPoint], height: Double) -> Path {
+        var path = curvePath(points: points)
+        guard let first = points.first, let last = points.last else { return path }
+        path.addLine(to: CGPoint(x: last.x, y: height))
+        path.addLine(to: CGPoint(x: first.x, y: height))
+        path.closeSubpath()
+        return path
     }
 }

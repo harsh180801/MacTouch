@@ -28,12 +28,18 @@ final class AppViewModel {
     private(set) var calibrationProgress: CalibrationProgress?
     private(set) var showCalibrationSheet = false
     private(set) var lastActionStatus = "—"
+    private(set) var waveformPoints: [Double] = []
 
     private var calibrationService: CalibrationService?
     private var calibrationSensor: SensorService?
     private var calibrationStarted = false
     private var saveSettingsTask: Task<Void, Never>?
     private var saveActionsTask: Task<Void, Never>?
+    private var waveform = WaveformBuffer(capacity: 96)
+    private var waveformSampleCounter = 0
+    private var waveformEma: Double = 0
+    private var hasWaveformEma = false
+    private var waveformPeakReference = 0.03
 
     init(
         store: SettingsStore = SettingsStore(),
@@ -202,6 +208,11 @@ final class AppViewModel {
                 self?.record(gesture)
             }
         }
+        engine.onFilteredMagnitude = { [weak self] value in
+            Task { @MainActor in
+                self?.recordWaveform(value)
+            }
+        }
     }
 
     private func applyEngineStatus(_ status: ListeningEngine.Status) {
@@ -315,5 +326,26 @@ final class AppViewModel {
         showCalibrationSheet = false
         phase = .idle
         statusMessage = "Idle"
+    }
+
+    private func recordWaveform(_ value: Double) {
+        waveformSampleCounter += 1
+        // Keep UI smooth in popover by downsampling fast sensor callbacks.
+        guard waveformSampleCounter % 8 == 0 else { return }
+        let clamped = max(0, value)
+        let emaAlpha = 0.33
+        if hasWaveformEma {
+            waveformEma = (emaAlpha * clamped) + ((1 - emaAlpha) * waveformEma)
+        } else {
+            waveformEma = clamped
+            hasWaveformEma = true
+        }
+
+        waveform.append(waveformEma)
+
+        // Hold peaks briefly, then decay reference slowly to prevent jumpy scaling.
+        let decayPerSample = 0.987
+        waveformPeakReference = max(waveformEma, waveformPeakReference * decayPerSample)
+        waveformPoints = waveform.normalized(reference: waveformPeakReference)
     }
 }

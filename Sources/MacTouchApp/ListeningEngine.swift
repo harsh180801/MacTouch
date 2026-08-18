@@ -19,6 +19,7 @@ final class ListeningEngine: @unchecked Sendable {
 
     var onGesture: (@Sendable (TapGestureEvent) -> Void)?
     var onStatus: (@Sendable (Status) -> Void)?
+    var onFilteredMagnitude: (@Sendable (Double) -> Void)?
 
     var isAvailable: Bool { sensor.isAvailable() }
 
@@ -77,6 +78,7 @@ final class ListeningEngine: @unchecked Sendable {
 
     private func ingest(_ sample: SensorSample) {
         var emitted: [TapGestureEvent] = []
+        var filteredMagnitude: Double?
 
         lock.lock()
         guard running else {
@@ -84,6 +86,7 @@ final class ListeningEngine: @unchecked Sendable {
             return
         }
         let processed = processor.process(sample)
+        filteredMagnitude = processed.filteredMagnitude
         if let tap = detector.process(processed) {
             if let flushed = gestures.process(tap: tap) {
                 emitted.append(flushed)
@@ -96,6 +99,9 @@ final class ListeningEngine: @unchecked Sendable {
 
         for gesture in emitted {
             onGesture?(gesture)
+        }
+        if let filteredMagnitude {
+            onFilteredMagnitude?(filteredMagnitude)
         }
     }
 }
