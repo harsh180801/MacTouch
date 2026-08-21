@@ -26,7 +26,6 @@
       </p>
       <div class="hero-actions">
         <a class="btn primary" href="#install">Get Started</a>
-        <a class="btn ghost" href="https://github.com/harsh180801/MacTouch/releases/latest/download/MacTouchApp-macos-arm64.dmg" target="_blank" rel="noreferrer">Download for macOS</a>
         <a class="btn ghost" href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">View Project</a>
       </div>
       <p class="note">All signal processing runs locally on your Mac.</p>
@@ -60,27 +59,24 @@
       <h2>Install on your Mac</h2>
       <div class="install-layout">
         <article class="card">
-          <h3>Option A: Download Release (Recommended)</h3>
-          <p class="small release-meta">
-            <strong>Latest release:</strong>
-            <a id="latest-release-link" href="https://github.com/harsh180801/MacTouch/releases/latest" target="_blank" rel="noreferrer">Loading...</a>
-            <span id="latest-release-updated"></span>
+          <h3>Build from Source</h3>
+          <p class="small">
+            MacTouch is currently distributed as source only.
           </p>
-          <ol>
-            <li>Open the <a href="https://github.com/harsh180801/MacTouch/releases" target="_blank" rel="noreferrer">Releases page</a>.</li>
-            <li>Download <code>MacTouchApp-macos-arm64.dmg</code> from the latest release.</li>
-            <li>Open the disk image and drag <code>MacTouchApp</code> to Applications.</li>
-            <li>Launch the app from Applications.</li>
-          </ol>
-          <p class="small">Signed and notarized builds should launch normally. If prompted, allow Input Monitoring for your terminal or app host.</p>
-        </article>
-        <article class="card">
-          <h3>Option B: Build from Source</h3>
+          <h4>Prerequisites</h4>
+          <ul>
+            <li>Apple Silicon MacBook (M-series)</li>
+            <li>macOS 14 or newer</li>
+            <li>Xcode or Command Line Tools with Swift 6</li>
+            <li>Git installed</li>
+          </ul>
+          <h4>Build and run</h4>
 <pre><code>git clone https://github.com/harsh180801/MacTouch.git
 cd MacTouch
+swift test
 swift build
 swift run MacTouchApp</code></pre>
-          <p class="small">Requires Apple Silicon MacBook and Swift 6 toolchain (Xcode/Command Line Tools).</p>
+          <p class="small">On first run, allow Input Monitoring permissions if macOS prompts you.</p>
         </article>
       </div>
     </section>
@@ -103,35 +99,5 @@ swift run MacTouchApp</code></pre>
       <a href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">GitHub</a>
     </div>
   </footer>
-  <script>
-    (async function () {
-      const latestLink = document.getElementById("latest-release-link");
-      const updated = document.getElementById("latest-release-updated");
-      if (!latestLink || !updated) return;
-
-      try {
-        const response = await fetch("https://api.github.com/repos/harsh180801/MacTouch/releases/latest");
-        if (!response.ok) throw new Error("release fetch failed");
-        const release = await response.json();
-        const tag = release.tag_name || "latest";
-        const url = release.html_url || "https://github.com/harsh180801/MacTouch/releases/latest";
-        const publishedAt = release.published_at ? new Date(release.published_at) : null;
-
-        latestLink.textContent = tag;
-        latestLink.href = url;
-        if (publishedAt) {
-          updated.textContent = " · Updated " + publishedAt.toLocaleDateString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "numeric"
-          });
-        }
-      } catch (_error) {
-        latestLink.textContent = "View latest";
-        latestLink.href = "https://github.com/harsh180801/MacTouch/releases/latest";
-        updated.textContent = "";
-      }
-    })();
-  </script>
 </body>
 </html>

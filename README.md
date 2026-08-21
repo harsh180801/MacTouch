@@ -52,7 +52,6 @@ swift run MacTouchApp
 Menu-bar popover: start/stop listening, single/double/triple counters, threshold/grouping/cooldown sliders, **Calibrate…** (same JSON as CLI). Settings path: `~/.config/MacTouch/settings.json`.
 
 Design notes: [docs/design/2026-08-17-menubar-app.md](docs/design/2026-08-17-menubar-app.md).
-Release signing setup: [docs/release-signing-notarization.md](docs/release-signing-notarization.md).
 
 ## Phase 1 — sensor probe
 
