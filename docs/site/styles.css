@@ -170,6 +170,11 @@ code {
   font-size: 0.93rem;
 }
 
+.release-meta {
+  margin-top: 0;
+  margin-bottom: 0.7rem;
+}
+
 .timeline {
   display: grid;
   gap: 0.75rem;

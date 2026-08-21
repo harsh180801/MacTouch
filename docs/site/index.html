@@ -61,6 +61,11 @@
       <div class="install-layout">
         <article class="card">
           <h3>Option A: Download Release (Recommended)</h3>
+          <p class="small release-meta">
+            <strong>Latest release:</strong>
+            <a id="latest-release-link" href="https://github.com/harsh180801/MacTouch/releases/latest" target="_blank" rel="noreferrer">Loading...</a>
+            <span id="latest-release-updated"></span>
+          </p>
           <ol>
             <li>Open the <a href="https://github.com/harsh180801/MacTouch/releases" target="_blank" rel="noreferrer">Releases page</a>.</li>
             <li>Download <code>MacTouchApp-macos-arm64.zip</code> from the latest release.</li>
@@ -98,5 +103,35 @@ swift run MacTouchApp</code></pre>
       <a href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">GitHub</a>
     </div>
   </footer>
+  <script>
+    (async function () {
+      const latestLink = document.getElementById("latest-release-link");
+      const updated = document.getElementById("latest-release-updated");
+      if (!latestLink || !updated) return;
+
+      try {
+        const response = await fetch("https://api.github.com/repos/harsh180801/MacTouch/releases/latest");
+        if (!response.ok) throw new Error("release fetch failed");
+        const release = await response.json();
+        const tag = release.tag_name || "latest";
+        const url = release.html_url || "https://github.com/harsh180801/MacTouch/releases/latest";
+        const publishedAt = release.published_at ? new Date(release.published_at) : null;
+
+        latestLink.textContent = tag;
+        latestLink.href = url;
+        if (publishedAt) {
+          updated.textContent = " · Updated " + publishedAt.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric"
+          });
+        }
+      } catch (_error) {
+        latestLink.textContent = "View latest";
+        latestLink.href = "https://github.com/harsh180801/MacTouch/releases/latest";
+        updated.textContent = "";
+      }
+    })();
+  </script>
 </body>
 </html>
