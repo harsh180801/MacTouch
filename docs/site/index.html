@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MacTouch - Tap Gestures for MacBook</title>
+  <meta name="description" content="MacTouch turns physical taps on your Apple Silicon MacBook into single, double, and triple gesture actions.">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="hero">
+    <nav class="nav">
+      <div class="brand">MacTouch</div>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#usage">Usage</a>
+      </div>
+    </nav>
+    <div class="hero-content">
+      <p class="eyebrow">Native macOS Utility</p>
+      <h1>Control your Mac with physical taps.</h1>
+      <p class="lead">
+        MacTouch detects single, double, and triple taps on Apple Silicon MacBooks and maps them to actions
+        like running shortcuts, muting audio, launching apps, and showing notifications.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="#install">Get Started</a>
+        <a class="btn ghost" href="#install">Download (coming soon)</a>
+        <a class="btn ghost" href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">View Project</a>
+      </div>
+      <p class="note">All signal processing runs locally on your Mac.</p>
+    </div>
+  </header>
+
+  <main>
+    <section id="features" class="section container">
+      <h2>Features</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Tap Gesture Detection</h3>
+          <p>Reliable single, double, and triple tap recognition tuned for chassis taps on MacBook aluminum body.</p>
+        </article>
+        <article class="card">
+          <h3>Live Waveform Panel</h3>
+          <p>Built-in sparkline helps visualize tap signal quality with smoothing and adaptive scaling.</p>
+        </article>
+        <article class="card">
+          <h3>Calibration Wizard</h3>
+          <p>Guided idle, single, and double-tap calibration writes personalized settings for your environment.</p>
+        </article>
+        <article class="card">
+          <h3>Action Mapping</h3>
+          <p>Assign gestures to macOS Shortcuts, output mute toggle, app launch, or local notifications.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="install" class="section container">
+      <h2>Install on your Mac</h2>
+      <div class="install-layout">
+        <article class="card">
+          <h3>Option A: Download Release (Recommended)</h3>
+          <ol>
+            <li>Open the <a href="https://github.com/harsh180801/MacTouch/releases" target="_blank" rel="noreferrer">Releases page</a>.</li>
+            <li>Download the latest build artifact (.dmg or .zip when available).</li>
+            <li>Move <code>MacTouchApp</code> to Applications and launch it.</li>
+          </ol>
+          <p class="small">If macOS blocks launch, right-click app -> Open (first run) and allow Input Monitoring if prompted.</p>
+        </article>
+        <article class="card">
+          <h3>Option B: Build from Source</h3>
+<pre><code>git clone https://github.com/harsh180801/MacTouch.git
+cd MacTouch
+swift build
+swift run MacTouchApp</code></pre>
+          <p class="small">Requires Apple Silicon MacBook and Swift 6 toolchain (Xcode/Command Line Tools).</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="usage" class="section container">
+      <h2>How to use MacTouch</h2>
+      <div class="timeline">
+        <div class="step"><span>1</span><p>Launch <code>MacTouchApp</code> from menu bar and enable listening.</p></div>
+        <div class="step"><span>2</span><p>Run <strong>Calibrate...</strong> to capture your idle noise and tap rhythm.</p></div>
+        <div class="step"><span>3</span><p>Test single/double/triple taps and tune threshold/grouping/cooldown if needed.</p></div>
+        <div class="step"><span>4</span><p>Map gestures to actions and validate with the per-gesture <strong>Run</strong> button.</p></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p>MacTouch - Native tap gestures for Apple Silicon MacBook.</p>
+      <a href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>
