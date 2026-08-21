@@ -70,6 +70,50 @@
             <li>Xcode or Command Line Tools with Swift 6</li>
             <li>Git installed</li>
           </ul>
+          <details class="prereq-dropdown">
+            <summary>Optional: Install/check prerequisites via terminal</summary>
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Checking macOS version..."
+sw_vers
+
+echo "Checking Apple Silicon..."
+ARCH="$(uname -m)"
+if [[ "$ARCH" != "arm64" ]]; then
+  echo "MacTouch requires Apple Silicon (arm64). Found: $ARCH"
+  exit 1
+fi
+
+echo "Checking Xcode Command Line Tools..."
+if ! xcode-select -p >/dev/null 2>&1; then
+  echo "Installing Xcode Command Line Tools (a popup may appear)..."
+  xcode-select --install || true
+  echo "Finish the CLT install popup, then re-run this script."
+  exit 0
+fi
+
+echo "Checking Git..."
+if ! command -v git >/dev/null 2>&1; then
+  echo "Git not found. Installing Homebrew first..."
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  if [[ -d /opt/homebrew/bin ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  fi
+  brew install git
+fi
+
+echo "Checking Swift..."
+if ! command -v swift >/dev/null 2>&1; then
+  echo "Swift not found. Install full Xcode from App Store, then run:"
+  echo "sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+  exit 1
+fi
+
+echo "Prerequisites look good."
+echo "Git: $(git --version)"
+echo "Swift: $(swift --version | head -n 1)"</code></pre>
+          </details>
           <h4>Build and run</h4>
 <pre><code>git clone https://github.com/harsh180801/MacTouch.git
 cd MacTouch

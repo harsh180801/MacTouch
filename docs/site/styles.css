@@ -170,9 +170,22 @@ code {
   font-size: 0.93rem;
 }
 
-.release-meta {
-  margin-top: 0;
-  margin-bottom: 0.7rem;
+.prereq-dropdown {
+  margin: 0.8rem 0 0.4rem;
+  border: 1px solid #2a3a57;
+  border-radius: 10px;
+  background: rgba(11, 17, 29, 0.4);
+  padding: 0.55rem 0.7rem;
+}
+
+.prereq-dropdown summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.prereq-dropdown[open] summary {
+  margin-bottom: 0.55rem;
 }
 
 .timeline {
