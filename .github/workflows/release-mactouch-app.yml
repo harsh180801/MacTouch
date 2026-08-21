@@ -1,0 +1,37 @@
+name: Release MacTouchApp
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build release binary
+        run: swift build -c release --product MacTouchApp
+
+      - name: Package artifact
+        run: |
+          mkdir -p dist
+          cp .build/release/MacTouchApp dist/MacTouchApp
+          chmod +x dist/MacTouchApp
+          cd dist
+          zip -r MacTouchApp-macos-arm64.zip MacTouchApp
+
+      - name: Create GitHub release and upload asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/MacTouchApp-macos-arm64.zip
+          generate_release_notes: true
