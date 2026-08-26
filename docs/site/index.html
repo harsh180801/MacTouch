@@ -8,22 +8,29 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div class="bg-orb orb-a" aria-hidden="true"></div>
+  <div class="bg-orb orb-b" aria-hidden="true"></div>
   <header class="hero">
     <nav class="nav">
-      <div class="brand">MacTouch</div>
+      <div class="brand"><span class="brand-dot"></span>MacTouch</div>
       <div class="nav-links">
         <a href="#features">Features</a>
         <a href="#install">Install</a>
         <a href="#usage">Usage</a>
       </div>
     </nav>
-    <div class="hero-content">
+    <div class="hero-content card hero-panel">
       <p class="eyebrow">Native macOS Utility</p>
       <h1>Control your Mac with physical taps.</h1>
       <p class="lead">
         MacTouch detects single, double, and triple taps on Apple Silicon MacBooks and maps them to actions
         like running shortcuts, muting audio, launching apps, and showing notifications.
       </p>
+      <div class="hero-chips">
+        <span>Apple Silicon Only</span>
+        <span>100% Local Processing</span>
+        <span>Swift + SwiftUI</span>
+      </div>
       <div class="hero-actions">
         <a class="btn primary" href="#install">Get Started</a>
         <a class="btn ghost" href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">View Project</a>
@@ -37,18 +44,22 @@
       <h2>Features</h2>
       <div class="grid">
         <article class="card">
+          <p class="card-icon" aria-hidden="true">👆</p>
           <h3>Tap Gesture Detection</h3>
           <p>Reliable single, double, and triple tap recognition tuned for chassis taps on MacBook aluminum body.</p>
         </article>
         <article class="card">
+          <p class="card-icon" aria-hidden="true">📈</p>
           <h3>Live Waveform Panel</h3>
           <p>Built-in sparkline helps visualize tap signal quality with smoothing and adaptive scaling.</p>
         </article>
         <article class="card">
+          <p class="card-icon" aria-hidden="true">🎛️</p>
           <h3>Calibration Wizard</h3>
           <p>Guided idle, single, and double-tap calibration writes personalized settings for your environment.</p>
         </article>
         <article class="card">
+          <p class="card-icon" aria-hidden="true">⚡</p>
           <h3>Action Mapping</h3>
           <p>Assign gestures to macOS Shortcuts, output mute toggle, app launch, or local notifications.</p>
         </article>
@@ -63,6 +74,7 @@
           <p class="small">
             MacTouch is currently distributed as source only.
           </p>
+          <p class="small install-hint"><strong>Tip:</strong> This is best for developers comfortable with terminal setup.</p>
           <h4>Prerequisites</h4>
           <ul>
             <li>Apple Silicon MacBook (M-series)</li>
@@ -128,10 +140,10 @@ swift run MacTouchApp</code></pre>
     <section id="usage" class="section container">
       <h2>How to use MacTouch</h2>
       <div class="timeline">
-        <div class="step"><span>1</span><p>Launch <code>MacTouchApp</code> from menu bar and enable listening.</p></div>
-        <div class="step"><span>2</span><p>Run <strong>Calibrate...</strong> to capture your idle noise and tap rhythm.</p></div>
-        <div class="step"><span>3</span><p>Test single/double/triple taps and tune threshold/grouping/cooldown if needed.</p></div>
-        <div class="step"><span>4</span><p>Map gestures to actions and validate with the per-gesture <strong>Run</strong> button.</p></div>
+        <div class="step card"><span>1</span><p>Launch <code>MacTouchApp</code> from menu bar and enable listening.</p></div>
+        <div class="step card"><span>2</span><p>Run <strong>Calibrate...</strong> to capture your idle noise and tap rhythm.</p></div>
+        <div class="step card"><span>3</span><p>Test single/double/triple taps and tune threshold/grouping/cooldown if needed.</p></div>
+        <div class="step card"><span>4</span><p>Map gestures to actions and validate with the per-gesture <strong>Run</strong> button.</p></div>
       </div>
     </section>
 
