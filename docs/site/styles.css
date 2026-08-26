@@ -25,6 +25,10 @@ body {
   overflow-x: hidden;
 }
 
+body.no-scroll {
+  overflow: hidden;
+}
+
 a {
   color: var(--accent);
 }
@@ -258,10 +262,77 @@ h2 {
   background: rgba(0, 0, 0, 0.18);
 }
 
+.shot-open {
+  all: unset;
+  cursor: zoom-in;
+  display: block;
+  width: 100%;
+}
+
 .shot figcaption {
   margin-top: 0.6rem;
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 15, 0.86);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.lightbox.visible {
+  display: flex;
+}
+
+.lightbox img {
+  max-width: min(1100px, 92vw);
+  max-height: 86vh;
+  border-radius: 12px;
+  border: 1px solid rgba(163, 190, 237, 0.35);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-close,
+.lightbox-nav {
+  position: absolute;
+  border: 1px solid rgba(142, 170, 219, 0.32);
+  background: rgba(16, 24, 40, 0.78);
+  color: #eef4ff;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.lightbox-close {
+  top: 1rem;
+  right: 1rem;
+  width: 42px;
+  height: 42px;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.lightbox-nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 52px;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.lightbox-nav.prev {
+  left: 1rem;
+}
+
+.lightbox-nav.next {
+  right: 1rem;
 }
 
 .install-hint {

@@ -71,19 +71,27 @@
       <p class="small">Real screenshots from the current MacTouch menu-bar app.</p>
       <div class="ui-gallery">
         <figure class="shot card">
-          <img src="./images/mactouch-header-waveform.png" alt="MacTouch header and waveform panel">
+          <button class="shot-open" type="button">
+            <img src="./images/mactouch-header-waveform.png" alt="MacTouch header and waveform panel">
+          </button>
           <figcaption>Status header + live signal waveform.</figcaption>
         </figure>
         <figure class="shot card">
-          <img src="./images/mactouch-settings.png" alt="MacTouch threshold grouping and cooldown settings">
+          <button class="shot-open" type="button">
+            <img src="./images/mactouch-settings.png" alt="MacTouch threshold grouping and cooldown settings">
+          </button>
           <figcaption>Detection tuning sliders (threshold, grouping, cooldown).</figcaption>
         </figure>
         <figure class="shot card">
-          <img src="./images/mactouch-actions.png" alt="MacTouch shortcut actions section">
+          <button class="shot-open" type="button">
+            <img src="./images/mactouch-actions.png" alt="MacTouch shortcut actions section">
+          </button>
           <figcaption>Gesture action assignments and action cooldown controls.</figcaption>
         </figure>
         <figure class="shot card">
-          <img src="./images/mactouch-action-picker.png" alt="MacTouch action type dropdown opened">
+          <button class="shot-open" type="button">
+            <img src="./images/mactouch-action-picker.png" alt="MacTouch action type dropdown opened">
+          </button>
           <figcaption>Action type picker for each gesture (none, shortcut, mute, launch app, notify).</figcaption>
         </figure>
       </div>
@@ -178,5 +186,77 @@ swift run MacTouchApp</code></pre>
       <a href="https://github.com/harsh180801/MacTouch/" target="_blank" rel="noreferrer">GitHub</a>
     </div>
   </footer>
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <button type="button" class="lightbox-close" aria-label="Close image preview">×</button>
+    <button type="button" class="lightbox-nav prev" aria-label="Previous image">‹</button>
+    <img id="lightbox-image" src="" alt="">
+    <button type="button" class="lightbox-nav next" aria-label="Next image">›</button>
+  </div>
+  <script>
+    (() => {
+      const images = Array.from(document.querySelectorAll(".shot-open img"));
+      const lightbox = document.getElementById("lightbox");
+      const lightboxImage = document.getElementById("lightbox-image");
+      const closeButton = lightbox?.querySelector(".lightbox-close");
+      const prevButton = lightbox?.querySelector(".lightbox-nav.prev");
+      const nextButton = lightbox?.querySelector(".lightbox-nav.next");
+      let currentIndex = 0;
+
+      if (!lightbox || !lightboxImage || images.length === 0) {
+        return;
+      }
+
+      function renderImage() {
+        const img = images[currentIndex];
+        lightboxImage.src = img.src;
+        lightboxImage.alt = img.alt;
+      }
+
+      function openLightbox(index) {
+        currentIndex = index;
+        renderImage();
+        lightbox.classList.add("visible");
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.classList.add("no-scroll");
+      }
+
+      function closeLightbox() {
+        lightbox.classList.remove("visible");
+        lightbox.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("no-scroll");
+      }
+
+      function goNext() {
+        currentIndex = (currentIndex + 1) % images.length;
+        renderImage();
+      }
+
+      function goPrev() {
+        currentIndex = (currentIndex - 1 + images.length) % images.length;
+        renderImage();
+      }
+
+      images.forEach((img, index) => {
+        img.closest(".shot-open")?.addEventListener("click", () => openLightbox(index));
+      });
+
+      closeButton?.addEventListener("click", closeLightbox);
+      nextButton?.addEventListener("click", goNext);
+      prevButton?.addEventListener("click", goPrev);
+
+      lightbox.addEventListener("click", (event) => {
+        if (event.target === lightbox) {
+          closeLightbox();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (!lightbox.classList.contains("visible")) return;
+        if (event.key === "Escape") closeLightbox();
+        if (event.key === "ArrowRight") goNext();
+        if (event.key === "ArrowLeft") goPrev();
+      });
+    })();
+  </script>
 </body>
 </html>
