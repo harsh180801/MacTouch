@@ -250,10 +250,6 @@ h2 {
   margin: 0;
 }
 
-.shot-wide {
-  grid-column: 1 / -1;
-}
-
 .shot img {
   width: 100%;
   display: block;
